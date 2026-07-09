@@ -62,11 +62,10 @@ typedef enum
 //
 // P_NewChaseDir related LUT.
 //
-dirtype_t opposite[] = {DI_WEST,	  DI_SOUTHWEST, DI_SOUTH,
-						DI_SOUTHEAST, DI_EAST,		DI_NORTHEAST,
-						DI_NORTH,	  DI_NORTHWEST, DI_NODIR};
+dirtype_t opposite[] = { DI_WEST,	   DI_SOUTHWEST, DI_SOUTH,	   DI_SOUTHEAST, DI_EAST,
+						 DI_NORTHEAST, DI_NORTH,	 DI_NORTHWEST, DI_NODIR };
 
-dirtype_t diags[] = {DI_NORTHWEST, DI_NORTHEAST, DI_SOUTHWEST, DI_SOUTHEAST};
+dirtype_t diags[] = { DI_NORTHWEST, DI_NORTHEAST, DI_SOUTHWEST, DI_SOUTHEAST };
 
 void A_Fall(mobj_t* actor);
 
@@ -185,10 +184,8 @@ boolean P_CheckMissileRange(mobj_t* actor)
 		return false; // do not attack yet
 
 	// OPTIMIZE: get this from a global checksight
-	dist = P_AproxDistance(
-			   actor->x - actor->target->x, actor->y - actor->target->y
-		   ) -
-		   64 * FRACUNIT;
+	dist
+		= P_AproxDistance(actor->x - actor->target->x, actor->y - actor->target->y) - 64 * FRACUNIT;
 
 	if (!actor->info->meleestate)
 		dist -= 128 * FRACUNIT; // no melee attack, so fire more
@@ -208,8 +205,7 @@ boolean P_CheckMissileRange(mobj_t* actor)
 		dist >>= 1;
 	}
 
-	if (actor->type == MT_CYBORG || actor->type == MT_SPIDER ||
-		actor->type == MT_SKULL)
+	if (actor->type == MT_CYBORG || actor->type == MT_SPIDER || actor->type == MT_SKULL)
 	{
 		dist >>= 1;
 	}
@@ -231,8 +227,8 @@ boolean P_CheckMissileRange(mobj_t* actor)
 // Move in the current direction,
 // returns false if the move is blocked.
 //
-fixed_t xspeed[8] = {FRACUNIT, 47000, 0, -47000, -FRACUNIT, -47000, 0, 47000};
-fixed_t yspeed[8] = {0, 47000, FRACUNIT, 47000, 0, -47000, -FRACUNIT, -47000};
+fixed_t xspeed[8] = { FRACUNIT, 47000, 0, -47000, -FRACUNIT, -47000, 0, 47000 };
+fixed_t yspeed[8] = { 0, 47000, FRACUNIT, 47000, 0, -47000, -FRACUNIT, -47000 };
 
 #define MAXSPECIALCROSS 8
 
@@ -487,16 +483,11 @@ boolean P_LookForPlayers(mobj_t* actor, boolean allaround)
 
 		if (!allaround)
 		{
-			an = R_PointToAngle2(
-					 actor->x, actor->y, player->mo->x, player->mo->y
-				 ) -
-				 actor->angle;
+			an = R_PointToAngle2(actor->x, actor->y, player->mo->x, player->mo->y) - actor->angle;
 
 			if (an > ANG90 && an < ANG270)
 			{
-				dist = P_AproxDistance(
-					player->mo->x - actor->x, player->mo->y - actor->y
-				);
+				dist = P_AproxDistance(player->mo->x - actor->x, player->mo->y - actor->y);
 				// if real close, react anyway
 				if (dist > MELEERANGE)
 					continue; // behind back
@@ -581,20 +572,20 @@ seeyou:
 
 		switch (actor->info->seesound)
 		{
-			case sfx_posit1:
-			case sfx_posit2:
-			case sfx_posit3:
-				sound = sfx_posit1 + P_Random() % 3;
-				break;
+		case sfx_posit1:
+		case sfx_posit2:
+		case sfx_posit3:
+			sound = sfx_posit1 + P_Random() % 3;
+			break;
 
-			case sfx_bgsit1:
-			case sfx_bgsit2:
-				sound = sfx_bgsit1 + P_Random() % 2;
-				break;
+		case sfx_bgsit1:
+		case sfx_bgsit2:
+			sound = sfx_bgsit1 + P_Random() % 2;
+			break;
 
-			default:
-				sound = actor->info->seesound;
-				break;
+		default:
+			sound = actor->info->seesound;
+			break;
 		}
 
 		if (actor->type == MT_SPIDER || actor->type == MT_CYBORG)
@@ -721,8 +712,7 @@ void A_FaceTarget(mobj_t* actor)
 
 	actor->flags &= ~MF_AMBUSH;
 
-	actor->angle =
-		R_PointToAngle2(actor->x, actor->y, actor->target->x, actor->target->y);
+	actor->angle = R_PointToAngle2(actor->x, actor->y, actor->target->x, actor->target->y);
 
 	if (actor->target->flags & MF_SHADOW)
 		actor->angle += (P_Random() - P_Random()) << 21;
@@ -802,8 +792,7 @@ void A_CPosRefire(mobj_t* actor)
 	if (P_Random() < 40)
 		return;
 
-	if (!actor->target || actor->target->health <= 0 ||
-		!P_CheckSight(actor, actor->target))
+	if (!actor->target || actor->target->health <= 0 || !P_CheckSight(actor, actor->target))
 	{
 		P_SetMobjState(actor, actor->info->seestate);
 	}
@@ -817,8 +806,7 @@ void A_SpidRefire(mobj_t* actor)
 	if (P_Random() < 10)
 		return;
 
-	if (!actor->target || actor->target->health <= 0 ||
-		!P_CheckSight(actor, actor->target))
+	if (!actor->target || actor->target->health <= 0 || !P_CheckSight(actor, actor->target))
 	{
 		P_SetMobjState(actor, actor->info->seestate);
 	}
@@ -956,9 +944,7 @@ void A_Tracer(mobj_t* actor)
 	// spawn a puff of smoke behind the rocket
 	P_SpawnPuff(actor->x, actor->y, actor->z);
 
-	th = P_SpawnMobj(
-		actor->x - actor->momx, actor->y - actor->momy, actor->z, MT_SMOKE
-	);
+	th = P_SpawnMobj(actor->x - actor->momx, actor->y - actor->momy, actor->z, MT_SMOKE);
 
 	th->momz = FRACUNIT;
 	th->tics -= P_Random() & 3;
@@ -1059,8 +1045,7 @@ boolean PIT_VileCheck(mobj_t* thing)
 
 	maxdist = thing->info->radius + mobjinfo[MT_VILE].radius;
 
-	if (abs(thing->x - viletryx) > maxdist ||
-		abs(thing->y - viletryy) > maxdist)
+	if (abs(thing->x - viletryx) > maxdist || abs(thing->y - viletryy) > maxdist)
 		return true; // not actually touching
 
 	corpsehit = thing;
@@ -1200,9 +1185,7 @@ void A_VileTarget(mobj_t* actor)
 
 	A_FaceTarget(actor);
 
-	fog = P_SpawnMobj(
-		actor->target->x, actor->target->x, actor->target->z, MT_FIRE
-	);
+	fog = P_SpawnMobj(actor->target->x, actor->target->x, actor->target->z, MT_FIRE);
 
 	actor->tracer = fog;
 	fog->target = actor;
@@ -1364,8 +1347,8 @@ void A_PainShootSkull(mobj_t* actor, angle_t angle)
 	currentthinker = thinkercap.next;
 	while (currentthinker != &thinkercap)
 	{
-		if ((currentthinker->function.acp1 == (actionf_p1)P_MobjThinker) &&
-			((mobj_t*)currentthinker)->type == MT_SKULL)
+		if ((currentthinker->function.acp1 == (actionf_p1)P_MobjThinker)
+			&& ((mobj_t*)currentthinker)->type == MT_SKULL)
 			count++;
 		currentthinker = currentthinker->next;
 	}
@@ -1378,8 +1361,7 @@ void A_PainShootSkull(mobj_t* actor, angle_t angle)
 	// okay, there's playe for another one
 	an = angle >> ANGLETOFINESHIFT;
 
-	prestep = 4 * FRACUNIT +
-			  3 * (actor->info->radius + mobjinfo[MT_SKULL].radius) / 2;
+	prestep = 4 * FRACUNIT + 3 * (actor->info->radius + mobjinfo[MT_SKULL].radius) / 2;
 
 	x = actor->x + FixedMul(prestep, finecosine[an]);
 	y = actor->y + FixedMul(prestep, finesine[an]);
@@ -1426,23 +1408,23 @@ void A_Scream(mobj_t* actor)
 
 	switch (actor->info->deathsound)
 	{
-		case 0:
-			return;
+	case 0:
+		return;
 
-		case sfx_podth1:
-		case sfx_podth2:
-		case sfx_podth3:
-			sound = sfx_podth1 + P_Random() % 3;
-			break;
+	case sfx_podth1:
+	case sfx_podth2:
+	case sfx_podth3:
+		sound = sfx_podth1 + P_Random() % 3;
+		break;
 
-		case sfx_bgdth1:
-		case sfx_bgdth2:
-			sound = sfx_bgdth1 + P_Random() % 2;
-			break;
+	case sfx_bgdth1:
+	case sfx_bgdth2:
+		sound = sfx_bgdth1 + P_Random() % 2;
+		break;
 
-		default:
-			sound = actor->info->deathsound;
-			break;
+	default:
+		sound = actor->info->deathsound;
+		break;
 	}
 
 	// Check for bosses.
@@ -1507,54 +1489,54 @@ void A_BossDeath(mobj_t* mo)
 	{
 		switch (gameepisode)
 		{
-			case 1:
-				if (gamemap != 8)
-					return;
+		case 1:
+			if (gamemap != 8)
+				return;
 
-				if (mo->type != MT_BRUISER)
-					return;
-				break;
+			if (mo->type != MT_BRUISER)
+				return;
+			break;
 
-			case 2:
-				if (gamemap != 8)
-					return;
+		case 2:
+			if (gamemap != 8)
+				return;
 
+			if (mo->type != MT_CYBORG)
+				return;
+			break;
+
+		case 3:
+			if (gamemap != 8)
+				return;
+
+			if (mo->type != MT_SPIDER)
+				return;
+
+			break;
+
+		case 4:
+			switch (gamemap)
+			{
+			case 6:
 				if (mo->type != MT_CYBORG)
 					return;
 				break;
 
-			case 3:
-				if (gamemap != 8)
-					return;
-
+			case 8:
 				if (mo->type != MT_SPIDER)
 					return;
-
-				break;
-
-			case 4:
-				switch (gamemap)
-				{
-					case 6:
-						if (mo->type != MT_CYBORG)
-							return;
-						break;
-
-					case 8:
-						if (mo->type != MT_SPIDER)
-							return;
-						break;
-
-					default:
-						return;
-						break;
-				}
 				break;
 
 			default:
-				if (gamemap != 8)
-					return;
+				return;
 				break;
+			}
+			break;
+
+		default:
+			if (gamemap != 8)
+				return;
+			break;
 		}
 	}
 
@@ -1605,27 +1587,27 @@ void A_BossDeath(mobj_t* mo)
 	{
 		switch (gameepisode)
 		{
-			case 1:
+		case 1:
+			junk.tag = 666;
+			EV_DoFloor(&junk, lowerFloorToLowest);
+			return;
+			break;
+
+		case 4:
+			switch (gamemap)
+			{
+			case 6:
+				junk.tag = 666;
+				EV_DoDoor(&junk, blazeOpen);
+				return;
+				break;
+
+			case 8:
 				junk.tag = 666;
 				EV_DoFloor(&junk, lowerFloorToLowest);
 				return;
 				break;
-
-			case 4:
-				switch (gamemap)
-				{
-					case 6:
-						junk.tag = 666;
-						EV_DoDoor(&junk, blazeOpen);
-						return;
-						break;
-
-					case 8:
-						junk.tag = 666;
-						EV_DoFloor(&junk, lowerFloorToLowest);
-						return;
-						break;
-				}
+			}
 		}
 	}
 
@@ -1682,8 +1664,7 @@ void A_BrainAwake(mobj_t* mo)
 	braintargeton = 0;
 
 	thinker = thinkercap.next;
-	for (thinker = thinkercap.next; thinker != &thinkercap;
-		 thinker = thinker->next)
+	for (thinker = thinkercap.next; thinker != &thinkercap; thinker = thinker->next)
 	{
 		if (thinker->function.acp1 != (actionf_p1)P_MobjThinker)
 			continue; // not a mobj
@@ -1712,8 +1693,7 @@ void A_BrainScream(mobj_t* mo)
 	int z;
 	mobj_t* th;
 
-	for (x = mo->x - 196 * FRACUNIT; x < mo->x + 320 * FRACUNIT;
-		 x += FRACUNIT * 8)
+	for (x = mo->x - 196 * FRACUNIT; x < mo->x + 320 * FRACUNIT; x += FRACUNIT * 8)
 	{
 		y = mo->y - 320 * FRACUNIT;
 		z = 128 + P_Random() * 2 * FRACUNIT;
@@ -1773,8 +1753,7 @@ void A_BrainSpit(mobj_t* mo)
 	// spawn brain missile
 	newmobj = P_SpawnMissile(mo, targ, MT_SPAWNSHOT);
 	newmobj->target = targ;
-	newmobj->reactiontime =
-		((targ->y - mo->y) / newmobj->momy) / newmobj->state->tics;
+	newmobj->reactiontime = ((targ->y - mo->y) / newmobj->momy) / newmobj->state->tics;
 
 	S_StartSound(NULL, sfx_bospit);
 }

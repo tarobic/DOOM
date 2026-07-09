@@ -171,11 +171,9 @@ void W_AddFile(char* filename)
 			// Homebrew levels?
 			if (strncmp(header.identification, "PWAD", 4))
 			{
-				I_Error(
-					"Wad file %s doesn't have IWAD "
-					"or PWAD id\n",
-					filename
-				);
+				I_Error("Wad file %s doesn't have IWAD "
+						"or PWAD id\n",
+						filename);
 			}
 
 			// ???modifiedgame = true;

@@ -71,8 +71,8 @@ void P_CalcHeight(player_t* player)
 	// OPTIMIZE: tablify angle
 	// Note: a LUT allows for effects
 	//  like a ramp with low health.
-	player->bob = FixedMul(player->mo->momx, player->mo->momx) +
-				  FixedMul(player->mo->momy, player->mo->momy);
+	player->bob = FixedMul(player->mo->momx, player->mo->momx)
+				+ FixedMul(player->mo->momy, player->mo->momy);
 
 	player->bob >>= 2;
 
@@ -145,8 +145,7 @@ void P_MovePlayer(player_t* player)
 	if (cmd->sidemove && onground)
 		P_Thrust(player, player->mo->angle - ANG90, cmd->sidemove * 2048);
 
-	if ((cmd->forwardmove || cmd->sidemove) &&
-		player->mo->state == &states[S_PLAY])
+	if ((cmd->forwardmove || cmd->sidemove) && player->mo->state == &states[S_PLAY])
 	{
 		P_SetMobjState(player->mo, S_PLAY_RUN1);
 	}
@@ -179,10 +178,8 @@ void P_DeathThink(player_t* player)
 
 	if (player->attacker && player->attacker != player->mo)
 	{
-		angle = R_PointToAngle2(
-			player->mo->x, player->mo->y, player->attacker->x,
-			player->attacker->y
-		);
+		angle = R_PointToAngle2(player->mo->x, player->mo->y, player->attacker->x,
+								player->attacker->y);
 
 		delta = angle - player->mo->angle;
 
@@ -263,16 +260,14 @@ void P_PlayerThink(player_t* player)
 		//  (read: not in the middle of an attack).
 		newweapon = (cmd->buttons & BT_WEAPONMASK) >> BT_WEAPONSHIFT;
 
-		if (newweapon == wp_fist && player->weaponowned[wp_chainsaw] &&
-			!(player->readyweapon == wp_chainsaw &&
-			  player->powers[pw_strength]))
+		if (newweapon == wp_fist && player->weaponowned[wp_chainsaw]
+			&& !(player->readyweapon == wp_chainsaw && player->powers[pw_strength]))
 		{
 			newweapon = wp_chainsaw;
 		}
 
-		if ((gamemode == commercial) && newweapon == wp_shotgun &&
-			player->weaponowned[wp_supershotgun] &&
-			player->readyweapon != wp_supershotgun)
+		if ((gamemode == commercial) && newweapon == wp_shotgun
+			&& player->weaponowned[wp_supershotgun] && player->readyweapon != wp_supershotgun)
 		{
 			newweapon = wp_supershotgun;
 		}
@@ -281,8 +276,7 @@ void P_PlayerThink(player_t* player)
 		{
 			// Do not go to plasma or BFG in shareware,
 			//  even if cheated.
-			if ((newweapon != wp_plasma && newweapon != wp_bfg) ||
-				(gamemode != shareware))
+			if ((newweapon != wp_plasma && newweapon != wp_bfg) || (gamemode != shareware))
 			{
 				player->pendingweapon = newweapon;
 			}
@@ -332,16 +326,14 @@ void P_PlayerThink(player_t* player)
 	// Handling colormaps.
 	if (player->powers[pw_invulnerability])
 	{
-		if (player->powers[pw_invulnerability] > 4 * 32 ||
-			(player->powers[pw_invulnerability] & 8))
+		if (player->powers[pw_invulnerability] > 4 * 32 || (player->powers[pw_invulnerability] & 8))
 			player->fixedcolormap = INVERSECOLORMAP;
 		else
 			player->fixedcolormap = 0;
 	}
 	else if (player->powers[pw_infrared])
 	{
-		if (player->powers[pw_infrared] > 4 * 32 ||
-			(player->powers[pw_infrared] & 8))
+		if (player->powers[pw_infrared] > 4 * 32 || (player->powers[pw_infrared] & 8))
 		{
 			// almost full bright
 			player->fixedcolormap = 1;

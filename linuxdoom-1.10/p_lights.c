@@ -22,8 +22,7 @@
 //
 //-----------------------------------------------------------------------------
 
-static const char rcsid[] =
-	"$Id: p_lights.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
+static const char rcsid[] = "$Id: p_lights.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
 
 #include "m_random.h"
 #include "z_zone.h"
@@ -76,8 +75,7 @@ void P_SpawnFireFlicker(sector_t* sector)
 	flick->thinker.function.acp1 = (actionf_p1)T_FireFlicker;
 	flick->sector = sector;
 	flick->maxlight = sector->lightlevel;
-	flick->minlight =
-		P_FindMinSurroundingLight(sector, sector->lightlevel) + 16;
+	flick->minlight = P_FindMinSurroundingLight(sector, sector->lightlevel) + 16;
 	flick->count = 4;
 }
 
@@ -287,25 +285,25 @@ void T_Glow(glow_t* g)
 {
 	switch (g->direction)
 	{
-		case -1:
-			// DOWN
-			g->sector->lightlevel -= GLOWSPEED;
-			if (g->sector->lightlevel <= g->minlight)
-			{
-				g->sector->lightlevel += GLOWSPEED;
-				g->direction = 1;
-			}
-			break;
-
-		case 1:
-			// UP
+	case -1:
+		// DOWN
+		g->sector->lightlevel -= GLOWSPEED;
+		if (g->sector->lightlevel <= g->minlight)
+		{
 			g->sector->lightlevel += GLOWSPEED;
-			if (g->sector->lightlevel >= g->maxlight)
-			{
-				g->sector->lightlevel -= GLOWSPEED;
-				g->direction = -1;
-			}
-			break;
+			g->direction = 1;
+		}
+		break;
+
+	case 1:
+		// UP
+		g->sector->lightlevel += GLOWSPEED;
+		if (g->sector->lightlevel >= g->maxlight)
+		{
+			g->sector->lightlevel -= GLOWSPEED;
+			g->direction = -1;
+		}
+		break;
 	}
 }
 

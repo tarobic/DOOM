@@ -242,16 +242,13 @@ void R_DrawColumnLow(void)
 #define FUZZTABLE 50
 #define FUZZOFF (SCREENWIDTH)
 
-int fuzzoffset[FUZZTABLE] = {FUZZOFF,  -FUZZOFF, FUZZOFF,  -FUZZOFF, FUZZOFF,
-							 FUZZOFF,  -FUZZOFF, FUZZOFF,  FUZZOFF,	 -FUZZOFF,
-							 FUZZOFF,  FUZZOFF,	 FUZZOFF,  -FUZZOFF, FUZZOFF,
-							 FUZZOFF,  FUZZOFF,	 -FUZZOFF, -FUZZOFF, -FUZZOFF,
-							 -FUZZOFF, FUZZOFF,	 -FUZZOFF, -FUZZOFF, FUZZOFF,
-							 FUZZOFF,  FUZZOFF,	 FUZZOFF,  -FUZZOFF, FUZZOFF,
-							 -FUZZOFF, FUZZOFF,	 FUZZOFF,  -FUZZOFF, -FUZZOFF,
-							 FUZZOFF,  FUZZOFF,	 -FUZZOFF, -FUZZOFF, -FUZZOFF,
-							 -FUZZOFF, FUZZOFF,	 FUZZOFF,  FUZZOFF,	 FUZZOFF,
-							 -FUZZOFF, FUZZOFF,	 FUZZOFF,  -FUZZOFF, FUZZOFF};
+int fuzzoffset[FUZZTABLE]
+	= { FUZZOFF,  -FUZZOFF, FUZZOFF,  -FUZZOFF, FUZZOFF,  FUZZOFF,	-FUZZOFF, FUZZOFF,	FUZZOFF,
+		-FUZZOFF, FUZZOFF,	FUZZOFF,  FUZZOFF,	-FUZZOFF, FUZZOFF,	FUZZOFF,  FUZZOFF,	-FUZZOFF,
+		-FUZZOFF, -FUZZOFF, -FUZZOFF, FUZZOFF,	-FUZZOFF, -FUZZOFF, FUZZOFF,  FUZZOFF,	FUZZOFF,
+		FUZZOFF,  -FUZZOFF, FUZZOFF,  -FUZZOFF, FUZZOFF,  FUZZOFF,	-FUZZOFF, -FUZZOFF, FUZZOFF,
+		FUZZOFF,  -FUZZOFF, -FUZZOFF, -FUZZOFF, -FUZZOFF, FUZZOFF,	FUZZOFF,  FUZZOFF,	FUZZOFF,
+		-FUZZOFF, FUZZOFF,	FUZZOFF,  -FUZZOFF, FUZZOFF };
 
 int fuzzpos = 0;
 
@@ -441,8 +438,7 @@ void R_InitTranslationTables(void)
 		else
 		{
 			// Keep all other colors as is.
-			translationtables[i] = translationtables[i + 256] =
-				translationtables[i + 512] = i;
+			translationtables[i] = translationtables[i + 256] = translationtables[i + 512] = i;
 		}
 	}
 }
@@ -487,8 +483,7 @@ void R_DrawSpan(void)
 	int spot;
 
 #ifdef RANGECHECK
-	if (ds_x2 < ds_x1 || ds_x1 < 0 || ds_x2 >= SCREENWIDTH ||
-		(unsigned)ds_y > SCREENHEIGHT)
+	if (ds_x2 < ds_x1 || ds_x1 < 0 || ds_x2 >= SCREENWIDTH || (unsigned)ds_y > SCREENHEIGHT)
 	{
 		I_Error("R_DrawSpan: %i to %i at %i", ds_x1, ds_x2, ds_y);
 	}
@@ -603,8 +598,7 @@ void R_DrawSpanLow(void)
 	int spot;
 
 #ifdef RANGECHECK
-	if (ds_x2 < ds_x1 || ds_x1 < 0 || ds_x2 >= SCREENWIDTH ||
-		(unsigned)ds_y > SCREENHEIGHT)
+	if (ds_x2 < ds_x1 || ds_x1 < 0 || ds_x2 >= SCREENWIDTH || (unsigned)ds_y > SCREENHEIGHT)
 	{
 		I_Error("R_DrawSpan: %i to %i at %i", ds_x1, ds_x2, ds_y);
 	}
@@ -732,25 +726,15 @@ void R_FillBackScreen(void)
 		V_DrawPatch(viewwindowx + scaledviewwidth, viewwindowy + y, 1, patch);
 
 	// Draw beveled edge.
-	V_DrawPatch(
-		viewwindowx - 8, viewwindowy - 8, 1,
-		W_CacheLumpName("brdr_tl", PU_CACHE)
-	);
+	V_DrawPatch(viewwindowx - 8, viewwindowy - 8, 1, W_CacheLumpName("brdr_tl", PU_CACHE));
 
-	V_DrawPatch(
-		viewwindowx + scaledviewwidth, viewwindowy - 8, 1,
-		W_CacheLumpName("brdr_tr", PU_CACHE)
-	);
+	V_DrawPatch(viewwindowx + scaledviewwidth, viewwindowy - 8, 1,
+				W_CacheLumpName("brdr_tr", PU_CACHE));
 
-	V_DrawPatch(
-		viewwindowx - 8, viewwindowy + viewheight, 1,
-		W_CacheLumpName("brdr_bl", PU_CACHE)
-	);
+	V_DrawPatch(viewwindowx - 8, viewwindowy + viewheight, 1, W_CacheLumpName("brdr_bl", PU_CACHE));
 
-	V_DrawPatch(
-		viewwindowx + scaledviewwidth, viewwindowy + viewheight, 1,
-		W_CacheLumpName("brdr_br", PU_CACHE)
-	);
+	V_DrawPatch(viewwindowx + scaledviewwidth, viewwindowy + viewheight, 1,
+				W_CacheLumpName("brdr_br", PU_CACHE));
 }
 
 //

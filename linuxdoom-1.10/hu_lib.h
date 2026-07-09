@@ -119,10 +119,8 @@ void HUlib_eraseTextLine(hu_textline_t* l);
 //
 
 // ?
-void HUlib_initSText(
-	hu_stext_t* s, int x, int y, int h, patch_t** font, int startchar,
-	boolean* on
-);
+void HUlib_initSText(hu_stext_t* s, int x, int y, int h, patch_t** font, int startchar,
+					 boolean* on);
 
 // add a new line
 void HUlib_addLineToSText(hu_stext_t* s);
@@ -137,9 +135,7 @@ void HUlib_drawSText(hu_stext_t* s);
 void HUlib_eraseSText(hu_stext_t* s);
 
 // Input Text Line widget routines
-void HUlib_initIText(
-	hu_itext_t* it, int x, int y, patch_t** font, int startchar, boolean* on
-);
+void HUlib_initIText(hu_itext_t* it, int x, int y, patch_t** font, int startchar, boolean* on);
 
 // enforces left margin
 void HUlib_delCharFromIText(hu_itext_t* it);

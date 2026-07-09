@@ -23,8 +23,7 @@
 //
 //-----------------------------------------------------------------------------
 
-static const char rcsid[] =
-	"$Id: st_stuff.c,v 1.6 1997/02/03 22:45:13 b1 Exp $";
+static const char rcsid[] = "$Id: st_stuff.c,v 1.6 1997/02/03 22:45:13 b1 Exp $";
 
 #include <stdio.h>
 
@@ -97,8 +96,7 @@ static const char rcsid[] =
 #define ST_NUMTURNFACES 2
 #define ST_NUMSPECIALFACES 3
 
-#define ST_FACESTRIDE                                                          \
-	(ST_NUMSTRAIGHTFACES + ST_NUMTURNFACES + ST_NUMSPECIALFACES)
+#define ST_FACESTRIDE (ST_NUMSTRAIGHTFACES + ST_NUMTURNFACES + ST_NUMSPECIALFACES)
 
 #define ST_NUMEXTRAFACES 2
 
@@ -385,7 +383,7 @@ static int st_randomnumber;
 // Massive bunches of cheat shit
 //  to keep it from being easy to figure them out.
 // Yeah, right...
-unsigned char cheat_mus_seq[] = {0xb2, 0x26, 0xb6, 0xae, 0xea, 1, 0, 0, 0xff};
+unsigned char cheat_mus_seq[] = { 0xb2, 0x26, 0xb6, 0xae, 0xea, 1, 0, 0, 0xff };
 
 unsigned char cheat_choppers_seq[] = {
 	0xb2, 0x26, 0xe2, 0x32, 0xf6, 0x2a, 0x2a, 0xa6, 0x6a, 0xea, 0xff // id...
@@ -404,8 +402,8 @@ unsigned char cheat_ammonokey_seq[] = {
 };
 
 // Smashing Pumpkins Into Samml Piles Of Putried Debris.
-unsigned char cheat_noclip_seq[] = {0xb2, 0x26, 0xea, 0x2a, 0xb2, // idspispopd
-									0xea, 0x2a, 0xf6, 0x2a, 0x26, 0xff};
+unsigned char cheat_noclip_seq[] = { 0xb2, 0x26, 0xea, 0x2a, 0xb2, // idspispopd
+									 0xea, 0x2a, 0xf6, 0x2a, 0x26, 0xff };
 
 //
 unsigned char cheat_commercial_noclip_seq[] = {
@@ -413,13 +411,13 @@ unsigned char cheat_commercial_noclip_seq[] = {
 };
 
 unsigned char cheat_powerup_seq[7][10] = {
-	{0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0x6e, 0xff}, // beholdv
-	{0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xea, 0xff}, // beholds
-	{0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xb2, 0xff}, // beholdi
-	{0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0x6a, 0xff}, // beholdr
-	{0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xa2, 0xff}, // beholda
-	{0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0x36, 0xff}, // beholdl
-	{0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xff}		  // behold
+	{ 0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0x6e, 0xff }, // beholdv
+	{ 0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xea, 0xff }, // beholds
+	{ 0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xb2, 0xff }, // beholdi
+	{ 0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0x6a, 0xff }, // beholdr
+	{ 0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xa2, 0xff }, // beholda
+	{ 0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0x36, 0xff }, // beholdl
+	{ 0xb2, 0x26, 0x62, 0xa6, 0x32, 0xf6, 0x36, 0x26, 0xff }		// behold
 };
 
 unsigned char cheat_clev_seq[] = {
@@ -432,23 +430,21 @@ unsigned char cheat_mypos_seq[] = {
 };
 
 // Now what?
-cheatseq_t cheat_mus = {cheat_mus_seq, 0};
-cheatseq_t cheat_god = {cheat_god_seq, 0};
-cheatseq_t cheat_ammo = {cheat_ammo_seq, 0};
-cheatseq_t cheat_ammonokey = {cheat_ammonokey_seq, 0};
-cheatseq_t cheat_noclip = {cheat_noclip_seq, 0};
-cheatseq_t cheat_commercial_noclip = {cheat_commercial_noclip_seq, 0};
+cheatseq_t cheat_mus = { cheat_mus_seq, 0 };
+cheatseq_t cheat_god = { cheat_god_seq, 0 };
+cheatseq_t cheat_ammo = { cheat_ammo_seq, 0 };
+cheatseq_t cheat_ammonokey = { cheat_ammonokey_seq, 0 };
+cheatseq_t cheat_noclip = { cheat_noclip_seq, 0 };
+cheatseq_t cheat_commercial_noclip = { cheat_commercial_noclip_seq, 0 };
 
-cheatseq_t cheat_powerup[7] = {
-	{cheat_powerup_seq[0], 0}, {cheat_powerup_seq[1], 0},
-	{cheat_powerup_seq[2], 0}, {cheat_powerup_seq[3], 0},
-	{cheat_powerup_seq[4], 0}, {cheat_powerup_seq[5], 0},
-	{cheat_powerup_seq[6], 0}
-};
+cheatseq_t cheat_powerup[7]
+	= { { cheat_powerup_seq[0], 0 }, { cheat_powerup_seq[1], 0 }, { cheat_powerup_seq[2], 0 },
+		{ cheat_powerup_seq[3], 0 }, { cheat_powerup_seq[4], 0 }, { cheat_powerup_seq[5], 0 },
+		{ cheat_powerup_seq[6], 0 } };
 
-cheatseq_t cheat_choppers = {cheat_choppers_seq, 0};
-cheatseq_t cheat_clev = {cheat_clev_seq, 0};
-cheatseq_t cheat_mypos = {cheat_mypos_seq, 0};
+cheatseq_t cheat_choppers = { cheat_choppers_seq, 0 };
+cheatseq_t cheat_clev = { cheat_clev_seq, 0 };
+cheatseq_t cheat_mypos = { cheat_mypos_seq, 0 };
 
 //
 extern char* mapnames[];
@@ -482,15 +478,15 @@ boolean ST_Responder(event_t* ev)
 	{
 		switch (ev->data1)
 		{
-			case AM_MSGENTERED:
-				st_gamestate = AutomapState;
-				st_firsttime = true;
-				break;
+		case AM_MSGENTERED:
+			st_gamestate = AutomapState;
+			st_firsttime = true;
+			break;
 
-			case AM_MSGEXITED:
-				//	fprintf(stderr, "AM exited\n");
-				st_gamestate = FirstPersonState;
-				break;
+		case AM_MSGEXITED:
+			//	fprintf(stderr, "AM exited\n");
+			st_gamestate = FirstPersonState;
+			break;
 		}
 	}
 
@@ -559,8 +555,7 @@ boolean ST_Responder(event_t* ev)
 
 				if (gamemode == commercial)
 				{
-					musnum =
-						mus_runnin + (buf[0] - '0') * 10 + buf[1] - '0' - 1;
+					musnum = mus_runnin + (buf[0] - '0') * 10 + buf[1] - '0' - 1;
 
 					if (((buf[0] - '0') * 10 + buf[1] - '0') > 35)
 						plyr->message = STSTR_NOMUS;
@@ -579,8 +574,8 @@ boolean ST_Responder(event_t* ev)
 			}
 			// Simplified, accepting both "noclip" and "idspispopd".
 			// no clipping mode cheat
-			else if (cht_CheckCheat(&cheat_noclip, ev->data1) ||
-					 cht_CheckCheat(&cheat_commercial_noclip, ev->data1))
+			else if (cht_CheckCheat(&cheat_noclip, ev->data1)
+					 || cht_CheckCheat(&cheat_commercial_noclip, ev->data1))
 			{
 				plyr->cheats ^= CF_NOCLIP;
 
@@ -621,11 +616,8 @@ boolean ST_Responder(event_t* ev)
 			else if (cht_CheckCheat(&cheat_mypos, ev->data1))
 			{
 				static char buf[ST_MSGWIDTH];
-				sprintf(
-					buf, "ang=0x%x;x,y=(0x%x,0x%x)",
-					players[consoleplayer].mo->angle,
-					players[consoleplayer].mo->x, players[consoleplayer].mo->y
-				);
+				sprintf(buf, "ang=0x%x;x,y=(0x%x,0x%x)", players[consoleplayer].mo->angle,
+						players[consoleplayer].mo->x, players[consoleplayer].mo->y);
 				plyr->message = buf;
 			}
 		}
@@ -759,10 +751,8 @@ void ST_updateFaceWidget(void)
 			}
 			else
 			{
-				badguyangle = R_PointToAngle2(
-					plyr->mo->x, plyr->mo->y, plyr->attacker->x,
-					plyr->attacker->y
-				);
+				badguyangle = R_PointToAngle2(plyr->mo->x, plyr->mo->y, plyr->attacker->x,
+											  plyr->attacker->y);
 
 				if (badguyangle > plyr->mo->angle)
 				{
@@ -972,8 +962,7 @@ void ST_doPaletteStuff(void)
 		palette += STARTBONUSPALS;
 	}
 
-	else if (plyr->powers[pw_ironfeet] > 4 * 32 ||
-			 plyr->powers[pw_ironfeet] & 8)
+	else if (plyr->powers[pw_ironfeet] > 4 * 32 || plyr->powers[pw_ironfeet] & 8)
 		palette = RADIATIONPAL;
 	else
 		palette = 0;
@@ -1207,108 +1196,71 @@ void ST_createWidgets(void)
 	int i;
 
 	// ready weapon ammo
-	STlib_initNum(
-		&w_ready, ST_AMMOX, ST_AMMOY, tallnum,
-		&plyr->ammo[weaponinfo[plyr->readyweapon].ammo], &st_statusbaron,
-		ST_AMMOWIDTH
-	);
+	STlib_initNum(&w_ready, ST_AMMOX, ST_AMMOY, tallnum,
+				  &plyr->ammo[weaponinfo[plyr->readyweapon].ammo], &st_statusbaron, ST_AMMOWIDTH);
 
 	// the last weapon type
 	w_ready.data = plyr->readyweapon;
 
 	// health percentage
-	STlib_initPercent(
-		&w_health, ST_HEALTHX, ST_HEALTHY, tallnum, &plyr->health,
-		&st_statusbaron, tallpercent
-	);
+	STlib_initPercent(&w_health, ST_HEALTHX, ST_HEALTHY, tallnum, &plyr->health, &st_statusbaron,
+					  tallpercent);
 
 	// arms background
-	STlib_initBinIcon(
-		&w_armsbg, ST_ARMSBGX, ST_ARMSBGY, armsbg, &st_notdeathmatch,
-		&st_statusbaron
-	);
+	STlib_initBinIcon(&w_armsbg, ST_ARMSBGX, ST_ARMSBGY, armsbg, &st_notdeathmatch,
+					  &st_statusbaron);
 
 	// weapons owned
 	for (i = 0; i < 6; i++)
 	{
-		STlib_initMultIcon(
-			&w_arms[i], ST_ARMSX + (i % 3) * ST_ARMSXSPACE,
-			ST_ARMSY + (i / 3) * ST_ARMSYSPACE, arms[i],
-			(int*)&plyr->weaponowned[i + 1], &st_armson
-		);
+		STlib_initMultIcon(&w_arms[i], ST_ARMSX + (i % 3) * ST_ARMSXSPACE,
+						   ST_ARMSY + (i / 3) * ST_ARMSYSPACE, arms[i],
+						   (int*)&plyr->weaponowned[i + 1], &st_armson);
 	}
 
 	// frags sum
-	STlib_initNum(
-		&w_frags, ST_FRAGSX, ST_FRAGSY, tallnum, &st_fragscount, &st_fragson,
-		ST_FRAGSWIDTH
-	);
+	STlib_initNum(&w_frags, ST_FRAGSX, ST_FRAGSY, tallnum, &st_fragscount, &st_fragson,
+				  ST_FRAGSWIDTH);
 
 	// faces
-	STlib_initMultIcon(
-		&w_faces, ST_FACESX, ST_FACESY, faces, &st_faceindex, &st_statusbaron
-	);
+	STlib_initMultIcon(&w_faces, ST_FACESX, ST_FACESY, faces, &st_faceindex, &st_statusbaron);
 
 	// armor percentage - should be colored later
-	STlib_initPercent(
-		&w_armor, ST_ARMORX, ST_ARMORY, tallnum, &plyr->armorpoints,
-		&st_statusbaron, tallpercent
-	);
+	STlib_initPercent(&w_armor, ST_ARMORX, ST_ARMORY, tallnum, &plyr->armorpoints, &st_statusbaron,
+					  tallpercent);
 
 	// keyboxes 0-2
-	STlib_initMultIcon(
-		&w_keyboxes[0], ST_KEY0X, ST_KEY0Y, keys, &keyboxes[0], &st_statusbaron
-	);
+	STlib_initMultIcon(&w_keyboxes[0], ST_KEY0X, ST_KEY0Y, keys, &keyboxes[0], &st_statusbaron);
 
-	STlib_initMultIcon(
-		&w_keyboxes[1], ST_KEY1X, ST_KEY1Y, keys, &keyboxes[1], &st_statusbaron
-	);
+	STlib_initMultIcon(&w_keyboxes[1], ST_KEY1X, ST_KEY1Y, keys, &keyboxes[1], &st_statusbaron);
 
-	STlib_initMultIcon(
-		&w_keyboxes[2], ST_KEY2X, ST_KEY2Y, keys, &keyboxes[2], &st_statusbaron
-	);
+	STlib_initMultIcon(&w_keyboxes[2], ST_KEY2X, ST_KEY2Y, keys, &keyboxes[2], &st_statusbaron);
 
 	// ammo count (all four kinds)
-	STlib_initNum(
-		&w_ammo[0], ST_AMMO0X, ST_AMMO0Y, shortnum, &plyr->ammo[0],
-		&st_statusbaron, ST_AMMO0WIDTH
-	);
+	STlib_initNum(&w_ammo[0], ST_AMMO0X, ST_AMMO0Y, shortnum, &plyr->ammo[0], &st_statusbaron,
+				  ST_AMMO0WIDTH);
 
-	STlib_initNum(
-		&w_ammo[1], ST_AMMO1X, ST_AMMO1Y, shortnum, &plyr->ammo[1],
-		&st_statusbaron, ST_AMMO1WIDTH
-	);
+	STlib_initNum(&w_ammo[1], ST_AMMO1X, ST_AMMO1Y, shortnum, &plyr->ammo[1], &st_statusbaron,
+				  ST_AMMO1WIDTH);
 
-	STlib_initNum(
-		&w_ammo[2], ST_AMMO2X, ST_AMMO2Y, shortnum, &plyr->ammo[2],
-		&st_statusbaron, ST_AMMO2WIDTH
-	);
+	STlib_initNum(&w_ammo[2], ST_AMMO2X, ST_AMMO2Y, shortnum, &plyr->ammo[2], &st_statusbaron,
+				  ST_AMMO2WIDTH);
 
-	STlib_initNum(
-		&w_ammo[3], ST_AMMO3X, ST_AMMO3Y, shortnum, &plyr->ammo[3],
-		&st_statusbaron, ST_AMMO3WIDTH
-	);
+	STlib_initNum(&w_ammo[3], ST_AMMO3X, ST_AMMO3Y, shortnum, &plyr->ammo[3], &st_statusbaron,
+				  ST_AMMO3WIDTH);
 
 	// max ammo count (all four kinds)
-	STlib_initNum(
-		&w_maxammo[0], ST_MAXAMMO0X, ST_MAXAMMO0Y, shortnum, &plyr->maxammo[0],
-		&st_statusbaron, ST_MAXAMMO0WIDTH
-	);
+	STlib_initNum(&w_maxammo[0], ST_MAXAMMO0X, ST_MAXAMMO0Y, shortnum, &plyr->maxammo[0],
+				  &st_statusbaron, ST_MAXAMMO0WIDTH);
 
-	STlib_initNum(
-		&w_maxammo[1], ST_MAXAMMO1X, ST_MAXAMMO1Y, shortnum, &plyr->maxammo[1],
-		&st_statusbaron, ST_MAXAMMO1WIDTH
-	);
+	STlib_initNum(&w_maxammo[1], ST_MAXAMMO1X, ST_MAXAMMO1Y, shortnum, &plyr->maxammo[1],
+				  &st_statusbaron, ST_MAXAMMO1WIDTH);
 
-	STlib_initNum(
-		&w_maxammo[2], ST_MAXAMMO2X, ST_MAXAMMO2Y, shortnum, &plyr->maxammo[2],
-		&st_statusbaron, ST_MAXAMMO2WIDTH
-	);
+	STlib_initNum(&w_maxammo[2], ST_MAXAMMO2X, ST_MAXAMMO2Y, shortnum, &plyr->maxammo[2],
+				  &st_statusbaron, ST_MAXAMMO2WIDTH);
 
-	STlib_initNum(
-		&w_maxammo[3], ST_MAXAMMO3X, ST_MAXAMMO3Y, shortnum, &plyr->maxammo[3],
-		&st_statusbaron, ST_MAXAMMO3WIDTH
-	);
+	STlib_initNum(&w_maxammo[3], ST_MAXAMMO3X, ST_MAXAMMO3Y, shortnum, &plyr->maxammo[3],
+				  &st_statusbaron, ST_MAXAMMO3WIDTH);
 }
 
 static boolean st_stopped = true;

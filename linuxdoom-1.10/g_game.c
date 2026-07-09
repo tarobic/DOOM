@@ -161,9 +161,9 @@ int joybspeed;
 
 #define TURBOTHRESHOLD 0x32
 
-fixed_t forwardmove[2] = {0x19, 0x32};
-fixed_t sidemove[2] = {0x18, 0x28};
-fixed_t angleturn[3] = {640, 1280, 320}; // + slow turn
+fixed_t forwardmove[2] = { 0x19, 0x32 };
+fixed_t sidemove[2] = { 0x18, 0x28 };
+fixed_t angleturn[3] = { 640, 1280, 320 }; // + slow turn
 
 #define SLOWTURNTICS 6
 
@@ -236,16 +236,14 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 
 	cmd->consistancy = consistancy[consoleplayer][maketic % BACKUPTICS];
 
-	strafe = gamekeydown[key_strafe] || mousebuttons[mousebstrafe] ||
-			 joybuttons[joybstrafe];
+	strafe = gamekeydown[key_strafe] || mousebuttons[mousebstrafe] || joybuttons[joybstrafe];
 	speed = gamekeydown[key_speed] || joybuttons[joybspeed];
 
 	forward = side = 0;
 
 	// use two stage accelerative turning
 	// on the keyboard and joystick
-	if (joyxmove < 0 || joyxmove > 0 || gamekeydown[key_right] ||
-		gamekeydown[key_left])
+	if (joyxmove < 0 || joyxmove > 0 || gamekeydown[key_right] || gamekeydown[key_left])
 		turnheld += ticdup;
 	else
 		turnheld = 0;
@@ -307,8 +305,7 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 	// buttons
 	cmd->chatchar = HU_dequeueChatChar();
 
-	if (gamekeydown[key_fire] || mousebuttons[mousebfire] ||
-		joybuttons[joybfire])
+	if (gamekeydown[key_fire] || mousebuttons[mousebfire] || joybuttons[joybfire])
 		cmd->buttons |= BT_ATTACK;
 
 	if (gamekeydown[key_use] || joybuttons[joybuse])
@@ -410,8 +407,7 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 	if (sendsave)
 	{
 		sendsave = false;
-		cmd->buttons =
-			BT_SPECIAL | BTS_SAVEGAME | (savegameslot << BTS_SAVESHIFT);
+		cmd->buttons = BT_SPECIAL | BTS_SAVEGAME | (savegameslot << BTS_SAVESHIFT);
 	}
 }
 
@@ -433,8 +429,7 @@ void G_DoLoadLevel(void)
 
 	// DOOM determines the sky texture to be used
 	// depending on the current episode, and the game version.
-	if ((gamemode == commercial) || (gamemode == pack_tnt) ||
-		(gamemode == pack_plut))
+	if ((gamemode == commercial) || (gamemode == pack_tnt) || (gamemode == pack_plut))
 	{
 		skytexture = R_TextureNumForName("SKY3");
 		if (gamemap < 12)
@@ -479,8 +474,8 @@ void G_DoLoadLevel(void)
 boolean G_Responder(event_t* ev)
 {
 	// allow spy mode changes even during the demo
-	if (gamestate == GS_LEVEL && ev->type == ev_keydown &&
-		ev->data1 == KEY_F12 && (singledemo || !deathmatch))
+	if (gamestate == GS_LEVEL && ev->type == ev_keydown && ev->data1 == KEY_F12
+		&& (singledemo || !deathmatch))
 	{
 		// spy mode
 		do
@@ -488,17 +483,15 @@ boolean G_Responder(event_t* ev)
 			displayplayer++;
 			if (displayplayer == MAXPLAYERS)
 				displayplayer = 0;
-		} while (!playeringame[displayplayer] &&
-				 displayplayer != consoleplayer);
+		} while (!playeringame[displayplayer] && displayplayer != consoleplayer);
 		return true;
 	}
 
 	// any other key pops up menu if in demos
-	if (gameaction == ga_nothing && !singledemo &&
-		(demoplayback || gamestate == GS_DEMOSCREEN))
+	if (gameaction == ga_nothing && !singledemo && (demoplayback || gamestate == GS_DEMOSCREEN))
 	{
-		if (ev->type == ev_keydown || (ev->type == ev_mouse && ev->data1) ||
-			(ev->type == ev_joystick && ev->data1))
+		if (ev->type == ev_keydown || (ev->type == ev_mouse && ev->data1)
+			|| (ev->type == ev_joystick && ev->data1))
 		{
 			M_StartControlPanel();
 			return true;
@@ -531,40 +524,40 @@ boolean G_Responder(event_t* ev)
 
 	switch (ev->type)
 	{
-		case ev_keydown:
-			if (ev->data1 == KEY_PAUSE)
-			{
-				sendpause = true;
-				return true;
-			}
-			if (ev->data1 < NUMKEYS)
-				gamekeydown[ev->data1] = true;
-			return true; // eat key down events
+	case ev_keydown:
+		if (ev->data1 == KEY_PAUSE)
+		{
+			sendpause = true;
+			return true;
+		}
+		if (ev->data1 < NUMKEYS)
+			gamekeydown[ev->data1] = true;
+		return true; // eat key down events
 
-		case ev_keyup:
-			if (ev->data1 < NUMKEYS)
-				gamekeydown[ev->data1] = false;
-			return false; // always let key up events filter down
+	case ev_keyup:
+		if (ev->data1 < NUMKEYS)
+			gamekeydown[ev->data1] = false;
+		return false; // always let key up events filter down
 
-		case ev_mouse:
-			mousebuttons[0] = ev->data1 & 1;
-			mousebuttons[1] = ev->data1 & 2;
-			mousebuttons[2] = ev->data1 & 4;
-			mousex = ev->data2 * (mouseSensitivity + 5) / 10;
-			mousey = ev->data3 * (mouseSensitivity + 5) / 10;
-			return true; // eat events
+	case ev_mouse:
+		mousebuttons[0] = ev->data1 & 1;
+		mousebuttons[1] = ev->data1 & 2;
+		mousebuttons[2] = ev->data1 & 4;
+		mousex = ev->data2 * (mouseSensitivity + 5) / 10;
+		mousey = ev->data3 * (mouseSensitivity + 5) / 10;
+		return true; // eat events
 
-		case ev_joystick:
-			joybuttons[0] = ev->data1 & 1;
-			joybuttons[1] = ev->data1 & 2;
-			joybuttons[2] = ev->data1 & 4;
-			joybuttons[3] = ev->data1 & 8;
-			joyxmove = ev->data2;
-			joyymove = ev->data3;
-			return true; // eat events
+	case ev_joystick:
+		joybuttons[0] = ev->data1 & 1;
+		joybuttons[1] = ev->data1 & 2;
+		joybuttons[2] = ev->data1 & 4;
+		joybuttons[3] = ev->data1 & 8;
+		joyxmove = ev->data2;
+		joyymove = ev->data3;
+		return true; // eat events
 
-		default:
-			break;
+	default:
+		break;
 	}
 
 	return false;
@@ -590,36 +583,36 @@ void G_Ticker(void)
 	{
 		switch (gameaction)
 		{
-			case ga_loadlevel:
-				G_DoLoadLevel();
-				break;
-			case ga_newgame:
-				G_DoNewGame();
-				break;
-			case ga_loadgame:
-				G_DoLoadGame();
-				break;
-			case ga_savegame:
-				G_DoSaveGame();
-				break;
-			case ga_playdemo:
-				G_DoPlayDemo();
-				break;
-			case ga_completed:
-				G_DoCompleted();
-				break;
-			case ga_victory:
-				F_StartFinale();
-				break;
-			case ga_worlddone:
-				G_DoWorldDone();
-				break;
-			case ga_screenshot:
-				M_ScreenShot();
-				gameaction = ga_nothing;
-				break;
-			case ga_nothing:
-				break;
+		case ga_loadlevel:
+			G_DoLoadLevel();
+			break;
+		case ga_newgame:
+			G_DoNewGame();
+			break;
+		case ga_loadgame:
+			G_DoLoadGame();
+			break;
+		case ga_savegame:
+			G_DoSaveGame();
+			break;
+		case ga_playdemo:
+			G_DoPlayDemo();
+			break;
+		case ga_completed:
+			G_DoCompleted();
+			break;
+		case ga_victory:
+			F_StartFinale();
+			break;
+		case ga_worlddone:
+			G_DoWorldDone();
+			break;
+		case ga_screenshot:
+			M_ScreenShot();
+			gameaction = ga_nothing;
+			break;
+		case ga_nothing:
+			break;
 		}
 	}
 
@@ -641,8 +634,7 @@ void G_Ticker(void)
 				G_WriteDemoTiccmd(cmd);
 
 			// check for turbo cheats
-			if (cmd->forwardmove > TURBOTHRESHOLD && !(gametic & 31) &&
-				((gametic >> 5) & 3) == i)
+			if (cmd->forwardmove > TURBOTHRESHOLD && !(gametic & 31) && ((gametic >> 5) & 3) == i)
 			{
 				static char turbomessage[80];
 				extern char* player_names[4];
@@ -652,13 +644,10 @@ void G_Ticker(void)
 
 			if (netgame && !netdemo && !(gametic % ticdup))
 			{
-				if (gametic > BACKUPTICS &&
-					consistancy[i][buf] != cmd->consistancy)
+				if (gametic > BACKUPTICS && consistancy[i][buf] != cmd->consistancy)
 				{
-					I_Error(
-						"consistency failure (%i should be %i)",
-						cmd->consistancy, consistancy[i][buf]
-					);
+					I_Error("consistency failure (%i should be %i)", cmd->consistancy,
+							consistancy[i][buf]);
 				}
 				if (players[i].mo)
 					consistancy[i][buf] = players[i].mo->x;
@@ -677,22 +666,20 @@ void G_Ticker(void)
 			{
 				switch (players[i].cmd.buttons & BT_SPECIALMASK)
 				{
-					case BTS_PAUSE:
-						paused ^= 1;
-						if (paused)
-							S_PauseSound();
-						else
-							S_ResumeSound();
-						break;
+				case BTS_PAUSE:
+					paused ^= 1;
+					if (paused)
+						S_PauseSound();
+					else
+						S_ResumeSound();
+					break;
 
-					case BTS_SAVEGAME:
-						if (!savedescription[0])
-							strcpy(savedescription, "NET GAME");
-						savegameslot =
-							(players[i].cmd.buttons & BTS_SAVEMASK) >>
-							BTS_SAVESHIFT;
-						gameaction = ga_savegame;
-						break;
+				case BTS_SAVEGAME:
+					if (!savedescription[0])
+						strcpy(savedescription, "NET GAME");
+					savegameslot = (players[i].cmd.buttons & BTS_SAVEMASK) >> BTS_SAVESHIFT;
+					gameaction = ga_savegame;
+					break;
 				}
 			}
 		}
@@ -701,24 +688,24 @@ void G_Ticker(void)
 	// do main actions
 	switch (gamestate)
 	{
-		case GS_LEVEL:
-			P_Ticker();
-			ST_Ticker();
-			AM_Ticker();
-			HU_Ticker();
-			break;
+	case GS_LEVEL:
+		P_Ticker();
+		ST_Ticker();
+		AM_Ticker();
+		HU_Ticker();
+		break;
 
-		case GS_INTERMISSION:
-			WI_Ticker();
-			break;
+	case GS_INTERMISSION:
+		WI_Ticker();
+		break;
 
-		case GS_FINALE:
-			F_Ticker();
-			break;
+	case GS_FINALE:
+		F_Ticker();
+		break;
 
-		case GS_DEMOSCREEN:
-			D_PageTicker();
-			break;
+	case GS_DEMOSCREEN:
+		D_PageTicker();
+		break;
 	}
 }
 
@@ -822,8 +809,8 @@ boolean G_CheckSpot(int playernum, mapthing_t* mthing)
 	{
 		// first spawn of level, before corpses
 		for (i = 0; i < playernum; i++)
-			if (players[i].mo->x == mthing->x << FRACBITS &&
-				players[i].mo->y == mthing->y << FRACBITS)
+			if (players[i].mo->x == mthing->x << FRACBITS
+				&& players[i].mo->y == mthing->y << FRACBITS)
 				return false;
 		return true;
 	}
@@ -844,10 +831,8 @@ boolean G_CheckSpot(int playernum, mapthing_t* mthing)
 	ss = R_PointInSubsector(x, y);
 	an = (ANG45 * (mthing->angle / 45)) >> ANGLETOFINESHIFT;
 
-	mo = P_SpawnMobj(
-		x + 20 * finecosine[an], y + 20 * finesine[an], ss->sector->floorheight,
-		MT_TFOG
-	);
+	mo = P_SpawnMobj(x + 20 * finecosine[an], y + 20 * finesine[an], ss->sector->floorheight,
+					 MT_TFOG);
 
 	if (players[consoleplayer].viewz != 1)
 		S_StartSound(mo, sfx_telept); // don't start sound on first frame
@@ -938,12 +923,10 @@ void G_ScreenShot(void)
 }
 
 // DOOM Par Times
-int pars[4][10] = {
-	{0},
-	{0, 30, 75, 120, 90, 165, 180, 180, 30, 165},
-	{0, 90, 90, 90, 120, 90, 360, 240, 30, 170},
-	{0, 90, 45, 90, 150, 90, 90, 165, 30, 135}
-};
+int pars[4][10] = { { 0 },
+					{ 0, 30, 75, 120, 90, 165, 180, 180, 30, 165 },
+					{ 0, 90, 90, 90, 120, 90, 360, 240, 30, 170 },
+					{ 0, 90, 45, 90, 150, 90, 90, 165, 30, 135 } };
 
 // DOOM II Par Times
 int cpars[32] = {
@@ -992,13 +975,13 @@ void G_DoCompleted(void)
 	if (gamemode != commercial)
 		switch (gamemap)
 		{
-			case 8:
-				gameaction = ga_victory;
-				return;
-			case 9:
-				for (i = 0; i < MAXPLAYERS; i++)
-					players[i].didsecret = true;
-				break;
+		case 8:
+			gameaction = ga_victory;
+			return;
+		case 9:
+			for (i = 0; i < MAXPLAYERS; i++)
+				players[i].didsecret = true;
+			break;
 		}
 
 	// #if 0  Hmmm - why?
@@ -1027,22 +1010,22 @@ void G_DoCompleted(void)
 		if (secretexit)
 			switch (gamemap)
 			{
-				case 15:
-					wminfo.next = 30;
-					break;
-				case 31:
-					wminfo.next = 31;
-					break;
+			case 15:
+				wminfo.next = 30;
+				break;
+			case 31:
+				wminfo.next = 31;
+				break;
 			}
 		else
 			switch (gamemap)
 			{
-				case 31:
-				case 32:
-					wminfo.next = 15;
-					break;
-				default:
-					wminfo.next = gamemap;
+			case 31:
+			case 32:
+				wminfo.next = 15;
+				break;
+			default:
+				wminfo.next = gamemap;
 			}
 	}
 	else
@@ -1054,18 +1037,18 @@ void G_DoCompleted(void)
 			// returning from secret level
 			switch (gameepisode)
 			{
-				case 1:
-					wminfo.next = 3;
-					break;
-				case 2:
-					wminfo.next = 5;
-					break;
-				case 3:
-					wminfo.next = 6;
-					break;
-				case 4:
-					wminfo.next = 2;
-					break;
+			case 1:
+				wminfo.next = 3;
+				break;
+			case 2:
+				wminfo.next = 5;
+				break;
+			case 3:
+				wminfo.next = 6;
+				break;
+			case 4:
+				wminfo.next = 2;
+				break;
 			}
 		}
 		else
@@ -1089,9 +1072,7 @@ void G_DoCompleted(void)
 		wminfo.plyr[i].sitems = players[i].itemcount;
 		wminfo.plyr[i].ssecret = players[i].secretcount;
 		wminfo.plyr[i].stime = leveltime;
-		memcpy(
-			wminfo.plyr[i].frags, players[i].frags, sizeof(wminfo.plyr[i].frags)
-		);
+		memcpy(wminfo.plyr[i].frags, players[i].frags, sizeof(wminfo.plyr[i].frags));
 	}
 
 	gamestate = GS_INTERMISSION;
@@ -1118,16 +1099,16 @@ void G_WorldDone(void)
 	{
 		switch (gamemap)
 		{
-			case 15:
-			case 31:
-				if (!secretexit)
-					break;
-			case 6:
-			case 11:
-			case 20:
-			case 30:
-				F_StartFinale();
+		case 15:
+		case 31:
+			if (!secretexit)
 				break;
+		case 6:
+		case 11:
+		case 20:
+		case 30:
+			F_StartFinale();
+			break;
 		}
 	}
 }
@@ -1402,18 +1383,18 @@ void G_InitNew(skill_t skill, int episode, int map)
 	else
 		switch (episode)
 		{
-			case 1:
-				skytexture = R_TextureNumForName("SKY1");
-				break;
-			case 2:
-				skytexture = R_TextureNumForName("SKY2");
-				break;
-			case 3:
-				skytexture = R_TextureNumForName("SKY3");
-				break;
-			case 4: // Special Edition sky
-				skytexture = R_TextureNumForName("SKY4");
-				break;
+		case 1:
+			skytexture = R_TextureNumForName("SKY1");
+			break;
+		case 2:
+			skytexture = R_TextureNumForName("SKY2");
+			break;
+		case 3:
+			skytexture = R_TextureNumForName("SKY3");
+			break;
+		case 4: // Special Edition sky
+			skytexture = R_TextureNumForName("SKY4");
+			break;
 		}
 
 	G_DoLoadLevel();
@@ -1581,9 +1562,7 @@ boolean G_CheckDemoStatus(void)
 	if (timingdemo)
 	{
 		endtime = I_GetTime();
-		I_Error(
-			"timed %i gametics in %i realtics", gametic, endtime - starttime
-		);
+		I_Error("timed %i gametics in %i realtics", gametic, endtime - starttime);
 	}
 
 	if (demoplayback)

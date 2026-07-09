@@ -160,11 +160,8 @@ void HSendPacket(int node, int flags)
 		else
 			realretrans = -1;
 
-		fprintf(
-			debugfile, "send (%i + %i, R %i) [%i] ",
-			ExpandTics(netbuffer->starttic), netbuffer->numtics, realretrans,
-			doomcom->datalength
-		);
+		fprintf(debugfile, "send (%i + %i, R %i) [%i] ", ExpandTics(netbuffer->starttic),
+				netbuffer->numtics, realretrans, doomcom->datalength);
 
 		for (i = 0; i < doomcom->datalength; i++)
 			fprintf(debugfile, "%i ", ((byte*)netbuffer)[i]);
@@ -229,11 +226,9 @@ boolean HGetPacket(void)
 			else
 				realretrans = -1;
 
-			fprintf(
-				debugfile, "get %i = (%i + %i, R %i)[%i] ", doomcom->remotenode,
-				ExpandTics(netbuffer->starttic), netbuffer->numtics,
-				realretrans, doomcom->datalength
-			);
+			fprintf(debugfile, "get %i = (%i + %i, R %i)[%i] ", doomcom->remotenode,
+					ExpandTics(netbuffer->starttic), netbuffer->numtics, realretrans,
+					doomcom->datalength);
 
 			for (i = 0; i < doomcom->datalength; i++)
 				fprintf(debugfile, "%i ", ((byte*)netbuffer)[i]);
@@ -291,8 +286,7 @@ void GetPackets(void)
 		nodeforplayer[netconsole] = netnode;
 
 		// check for retransmit request
-		if (resendcount[netnode] <= 0 &&
-			(netbuffer->checksum & NCMD_RETRANSMIT))
+		if (resendcount[netnode] <= 0 && (netbuffer->checksum & NCMD_RETRANSMIT))
 		{
 			resendto[netnode] = ExpandTics(netbuffer->retransmitfrom);
 			if (debugfile)
@@ -309,10 +303,8 @@ void GetPackets(void)
 		if (realend < nettics[netnode])
 		{
 			if (debugfile)
-				fprintf(
-					debugfile, "out of order packet (%i + %i)\n", realstart,
-					netbuffer->numtics
-				);
+				fprintf(debugfile, "out of order packet (%i + %i)\n", realstart,
+						netbuffer->numtics);
 			continue;
 		}
 
@@ -321,10 +313,8 @@ void GetPackets(void)
 		{
 			// stop processing until the other system resends the missed tics
 			if (debugfile)
-				fprintf(
-					debugfile, "missed tics from %i (%i - %i)\n", netnode,
-					realstart, nettics[netnode]
-				);
+				fprintf(debugfile, "missed tics from %i (%i - %i)\n", netnode, realstart,
+						nettics[netnode]);
 			remoteresend[netnode] = true;
 			continue;
 		}
@@ -558,10 +548,8 @@ void D_CheckNetGame(void)
 	if (netgame)
 		D_ArbitrateNetStart();
 
-	printf(
-		"startskill %i  deathmatch: %i  startmap: %i  startepisode: %i\n",
-		startskill, deathmatch, startmap, startepisode
-	);
+	printf("startskill %i  deathmatch: %i  startmap: %i  startepisode: %i\n", startskill,
+		   deathmatch, startmap, startepisode);
 
 	// read values out of doomcom
 	ticdup = doomcom->ticdup;
@@ -574,10 +562,8 @@ void D_CheckNetGame(void)
 	for (i = 0; i < doomcom->numnodes; i++)
 		nodeingame[i] = true;
 
-	printf(
-		"player %i of %i (%i nodes)\n", consoleplayer + 1, doomcom->numplayers,
-		doomcom->numnodes
-	);
+	printf("player %i of %i (%i nodes)\n", consoleplayer + 1, doomcom->numplayers,
+		   doomcom->numnodes);
 }
 
 //
@@ -663,10 +649,8 @@ void TryRunTics(void)
 	frameon++;
 
 	if (debugfile)
-		fprintf(
-			debugfile, "=======real: %i  avail: %i  game: %i\n", realtics,
-			availabletics, counts
-		);
+		fprintf(debugfile, "=======real: %i  avail: %i  game: %i\n", realtics, availabletics,
+				counts);
 
 	if (!demoplayback)
 	{

@@ -24,8 +24,7 @@
 //
 //-----------------------------------------------------------------------------
 
-static const char rcsid[] =
-	"$Id: p_maputl.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
+static const char rcsid[] = "$Id: p_maputl.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
 
 #include <stdlib.h>
 
@@ -100,35 +99,35 @@ int P_BoxOnLineSide(fixed_t* tmbox, line_t* ld)
 
 	switch (ld->slopetype)
 	{
-		case ST_HORIZONTAL:
-			p1 = tmbox[BOXTOP] > ld->v1->y;
-			p2 = tmbox[BOXBOTTOM] > ld->v1->y;
-			if (ld->dx < 0)
-			{
-				p1 ^= 1;
-				p2 ^= 1;
-			}
-			break;
+	case ST_HORIZONTAL:
+		p1 = tmbox[BOXTOP] > ld->v1->y;
+		p2 = tmbox[BOXBOTTOM] > ld->v1->y;
+		if (ld->dx < 0)
+		{
+			p1 ^= 1;
+			p2 ^= 1;
+		}
+		break;
 
-		case ST_VERTICAL:
-			p1 = tmbox[BOXRIGHT] < ld->v1->x;
-			p2 = tmbox[BOXLEFT] < ld->v1->x;
-			if (ld->dy < 0)
-			{
-				p1 ^= 1;
-				p2 ^= 1;
-			}
-			break;
+	case ST_VERTICAL:
+		p1 = tmbox[BOXRIGHT] < ld->v1->x;
+		p2 = tmbox[BOXLEFT] < ld->v1->x;
+		if (ld->dy < 0)
+		{
+			p1 ^= 1;
+			p2 ^= 1;
+		}
+		break;
 
-		case ST_POSITIVE:
-			p1 = P_PointOnLineSide(tmbox[BOXLEFT], tmbox[BOXTOP], ld);
-			p2 = P_PointOnLineSide(tmbox[BOXRIGHT], tmbox[BOXBOTTOM], ld);
-			break;
+	case ST_POSITIVE:
+		p1 = P_PointOnLineSide(tmbox[BOXLEFT], tmbox[BOXTOP], ld);
+		p2 = P_PointOnLineSide(tmbox[BOXRIGHT], tmbox[BOXBOTTOM], ld);
+		break;
 
-		case ST_NEGATIVE:
-			p1 = P_PointOnLineSide(tmbox[BOXRIGHT], tmbox[BOXTOP], ld);
-			p2 = P_PointOnLineSide(tmbox[BOXLEFT], tmbox[BOXBOTTOM], ld);
-			break;
+	case ST_NEGATIVE:
+		p1 = P_PointOnLineSide(tmbox[BOXRIGHT], tmbox[BOXTOP], ld);
+		p2 = P_PointOnLineSide(tmbox[BOXLEFT], tmbox[BOXBOTTOM], ld);
+		break;
 	}
 
 	if (p1 == p2)
@@ -212,8 +211,7 @@ fixed_t P_InterceptVector(divline_t* v2, divline_t* v1)
 		return 0;
 	//	I_Error ("P_InterceptVector: parallel");
 
-	num = FixedMul((v1->x - v2->x) >> 8, v1->dy) +
-		  FixedMul((v2->y - v1->y) >> 8, v1->dx);
+	num = FixedMul((v1->x - v2->x) >> 8, v1->dy) + FixedMul((v2->y - v1->y) >> 8, v1->dx);
 
 	frac = FixedDiv(num, den);
 
@@ -340,8 +338,7 @@ void P_UnsetThingPosition(mobj_t* thing)
 			blockx = (thing->x - bmaporgx) >> MAPBLOCKSHIFT;
 			blocky = (thing->y - bmaporgy) >> MAPBLOCKSHIFT;
 
-			if (blockx >= 0 && blockx < bmapwidth && blocky >= 0 &&
-				blocky < bmapheight)
+			if (blockx >= 0 && blockx < bmapwidth && blocky >= 0 && blocky < bmapheight)
 			{
 				blocklinks[blocky * bmapwidth + blockx] = thing->bnext;
 			}
@@ -388,8 +385,7 @@ void P_SetThingPosition(mobj_t* thing)
 		blockx = (thing->x - bmaporgx) >> MAPBLOCKSHIFT;
 		blocky = (thing->y - bmaporgy) >> MAPBLOCKSHIFT;
 
-		if (blockx >= 0 && blockx < bmapwidth && blocky >= 0 &&
-			blocky < bmapheight)
+		if (blockx >= 0 && blockx < bmapwidth && blocky >= 0 && blocky < bmapheight)
 		{
 			link = &blocklinks[blocky * bmapwidth + blockx];
 			thing->bprev = NULL;
@@ -501,8 +497,8 @@ boolean PIT_AddLineIntercepts(line_t* ld)
 	divline_t dl;
 
 	// avoid precision problems with two routines
-	if (trace.dx > FRACUNIT * 16 || trace.dy > FRACUNIT * 16 ||
-		trace.dx < -FRACUNIT * 16 || trace.dy < -FRACUNIT * 16)
+	if (trace.dx > FRACUNIT * 16 || trace.dy > FRACUNIT * 16 || trace.dx < -FRACUNIT * 16
+		|| trace.dy < -FRACUNIT * 16)
 	{
 		s1 = P_PointOnDivlineSide(ld->v1->x, ld->v1->y, &trace);
 		s2 = P_PointOnDivlineSide(ld->v2->x, ld->v2->y, &trace);
@@ -659,10 +655,8 @@ boolean P_TraverseIntercepts(traverser_t func, fixed_t maxfrac)
 // Returns true if the traverser function returns true
 // for all lines.
 //
-boolean P_PathTraverse(
-	fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2, int flags,
-	boolean (*trav)(intercept_t*)
-)
+boolean P_PathTraverse(fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2, int flags,
+					   boolean (*trav)(intercept_t*))
 {
 	fixed_t xt1;
 	fixed_t yt1;

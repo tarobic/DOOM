@@ -254,8 +254,8 @@ int addsfx(int sfxid, int volume, int step, int seperation)
 
 	// Chainsaw troubles.
 	// Play these sound effects only one at a time.
-	if (sfxid == sfx_sawup || sfxid == sfx_sawidl || sfxid == sfx_sawful ||
-		sfxid == sfx_sawhit || sfxid == sfx_stnmov || sfxid == sfx_pistol)
+	if (sfxid == sfx_sawup || sfxid == sfx_sawidl || sfxid == sfx_sawful || sfxid == sfx_sawhit
+		|| sfxid == sfx_stnmov || sfxid == sfx_pistol)
 	{
 		// Loop all channels, check.
 		for (i = 0; i < NUM_CHANNELS; i++)

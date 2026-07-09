@@ -214,30 +214,30 @@ void D_Display(void)
 	// do buffered drawing
 	switch (gamestate)
 	{
-		case GS_LEVEL:
-			if (!gametic)
-				break;
-			if (automapactive)
-				AM_Drawer();
-			if (wipe || (viewheight != 200 && fullscreen))
-				redrawsbar = true;
-			if (inhelpscreensstate && !inhelpscreens)
-				redrawsbar = true; // just put away the help screen
-			ST_Drawer(viewheight == 200, redrawsbar);
-			fullscreen = viewheight == 200;
+	case GS_LEVEL:
+		if (!gametic)
 			break;
+		if (automapactive)
+			AM_Drawer();
+		if (wipe || (viewheight != 200 && fullscreen))
+			redrawsbar = true;
+		if (inhelpscreensstate && !inhelpscreens)
+			redrawsbar = true; // just put away the help screen
+		ST_Drawer(viewheight == 200, redrawsbar);
+		fullscreen = viewheight == 200;
+		break;
 
-		case GS_INTERMISSION:
-			WI_Drawer();
-			break;
+	case GS_INTERMISSION:
+		WI_Drawer();
+		break;
 
-		case GS_FINALE:
-			F_Drawer();
-			break;
+	case GS_FINALE:
+		F_Drawer();
+		break;
 
-		case GS_DEMOSCREEN:
-			D_PageDrawer();
-			break;
+	case GS_DEMOSCREEN:
+		D_PageDrawer();
+		break;
 	}
 
 	// draw buffered stuff to screen
@@ -285,10 +285,8 @@ void D_Display(void)
 			y = 4;
 		else
 			y = viewwindowy + 4;
-		V_DrawPatchDirect(
-			viewwindowx + (scaledviewwidth - 68) / 2, y, 0,
-			W_CacheLumpName("M_PAUSE", PU_CACHE)
-		);
+		V_DrawPatchDirect(viewwindowx + (scaledviewwidth - 68) / 2, y, 0,
+						  W_CacheLumpName("M_PAUSE", PU_CACHE));
 	}
 
 	// menus go directly to the screen
@@ -315,8 +313,7 @@ void D_Display(void)
 			tics = nowtime - wipestart;
 		} while (!tics);
 		wipestart = nowtime;
-		done =
-			wipe_ScreenWipe(wipe_Melt, 0, 0, SCREENWIDTH, SCREENHEIGHT, tics);
+		done = wipe_ScreenWipe(wipe_Melt, 0, 0, SCREENWIDTH, SCREENHEIGHT, tics);
 		I_UpdateNoBlit();
 		M_Drawer();		  // menu is drawn even on top of wipes
 		I_FinishUpdate(); // page flip or blit buffer
@@ -436,54 +433,54 @@ void D_DoAdvanceDemo(void)
 
 	switch (demosequence)
 	{
-		case 0:
-			if (gamemode == commercial)
-				pagetic = 35 * 11;
-			else
-				pagetic = 170;
-			gamestate = GS_DEMOSCREEN;
+	case 0:
+		if (gamemode == commercial)
+			pagetic = 35 * 11;
+		else
+			pagetic = 170;
+		gamestate = GS_DEMOSCREEN;
+		pagename = "TITLEPIC";
+		if (gamemode == commercial)
+			S_StartMusic(mus_dm2ttl);
+		else
+			S_StartMusic(mus_intro);
+		break;
+	case 1:
+		G_DeferedPlayDemo("demo1");
+		break;
+	case 2:
+		pagetic = 200;
+		gamestate = GS_DEMOSCREEN;
+		pagename = "CREDIT";
+		break;
+	case 3:
+		G_DeferedPlayDemo("demo2");
+		break;
+	case 4:
+		gamestate = GS_DEMOSCREEN;
+		if (gamemode == commercial)
+		{
+			pagetic = 35 * 11;
 			pagename = "TITLEPIC";
-			if (gamemode == commercial)
-				S_StartMusic(mus_dm2ttl);
-			else
-				S_StartMusic(mus_intro);
-			break;
-		case 1:
-			G_DeferedPlayDemo("demo1");
-			break;
-		case 2:
+			S_StartMusic(mus_dm2ttl);
+		}
+		else
+		{
 			pagetic = 200;
-			gamestate = GS_DEMOSCREEN;
-			pagename = "CREDIT";
-			break;
-		case 3:
-			G_DeferedPlayDemo("demo2");
-			break;
-		case 4:
-			gamestate = GS_DEMOSCREEN;
-			if (gamemode == commercial)
-			{
-				pagetic = 35 * 11;
-				pagename = "TITLEPIC";
-				S_StartMusic(mus_dm2ttl);
-			}
-			else
-			{
-				pagetic = 200;
 
-				if (gamemode == retail)
-					pagename = "CREDIT";
-				else
-					pagename = "HELP2";
-			}
-			break;
-		case 5:
-			G_DeferedPlayDemo("demo3");
-			break;
-			// THE DEFINITIVE DOOM Special Edition demo
-		case 6:
-			G_DeferedPlayDemo("demo4");
-			break;
+			if (gamemode == retail)
+				pagename = "CREDIT";
+			else
+				pagename = "HELP2";
+		}
+		break;
+	case 5:
+		G_DeferedPlayDemo("demo3");
+		break;
+		// THE DEFINITIVE DOOM Special Edition demo
+	case 6:
+		G_DeferedPlayDemo("demo4");
+		break;
 	}
 }
 
@@ -728,12 +725,10 @@ void FindResponseFile(void)
 			do
 			{
 				myargv[indexinfile++] = infile + k;
-				while (k < size &&
-					   ((*(infile + k) >= ' ' + 1) && (*(infile + k) <= 'z')))
+				while (k < size && ((*(infile + k) >= ' ' + 1) && (*(infile + k) <= 'z')))
 					k++;
 				*(infile + k) = 0;
-				while (k < size &&
-					   ((*(infile + k) <= ' ') || (*(infile + k) > 'z')))
+				while (k < size && ((*(infile + k) <= ' ') || (*(infile + k) > 'z')))
 					k++;
 			} while (k < size);
 
@@ -776,67 +771,57 @@ void D_DoomMain(void)
 
 	switch (gamemode)
 	{
-		case retail:
-			sprintf(
-				title,
+	case retail:
+		sprintf(title,
 				"                         "
 				"The Ultimate DOOM Startup v%i.%i"
 				"                           ",
-				VERSION / 100, VERSION % 100
-			);
-			break;
-		case shareware:
-			sprintf(
-				title,
+				VERSION / 100, VERSION % 100);
+		break;
+	case shareware:
+		sprintf(title,
 				"                            "
 				"DOOM Shareware Startup v%i.%i"
 				"                           ",
-				VERSION / 100, VERSION % 100
-			);
-			break;
-		case registered:
-			sprintf(
-				title,
+				VERSION / 100, VERSION % 100);
+		break;
+	case registered:
+		sprintf(title,
 				"                            "
 				"DOOM Registered Startup v%i.%i"
 				"                           ",
-				VERSION / 100, VERSION % 100
-			);
-			break;
-		case commercial:
-			sprintf(
-				title,
+				VERSION / 100, VERSION % 100);
+		break;
+	case commercial:
+		sprintf(title,
 				"                         "
 				"DOOM 2: Hell on Earth v%i.%i"
 				"                           ",
-				VERSION / 100, VERSION % 100
-			);
+				VERSION / 100, VERSION % 100);
+		break;
+		/*FIXME
+			   case pack_plut:
+			sprintf (title,
+				 "                   "
+				 "DOOM 2: Plutonia Experiment v%i.%i"
+				 "                           ",
+				 VERSION/100,VERSION%100);
 			break;
-			/*FIXME
-				   case pack_plut:
-				sprintf (title,
-					 "                   "
-					 "DOOM 2: Plutonia Experiment v%i.%i"
-					 "                           ",
-					 VERSION/100,VERSION%100);
-				break;
-				  case pack_tnt:
-				sprintf (title,
-					 "                     "
-					 "DOOM 2: TNT - Evilution v%i.%i"
-					 "                           ",
-					 VERSION/100,VERSION%100);
-				break;
-			*/
-		default:
-			sprintf(
-				title,
+			  case pack_tnt:
+			sprintf (title,
+				 "                     "
+				 "DOOM 2: TNT - Evilution v%i.%i"
+				 "                           ",
+				 VERSION/100,VERSION%100);
+			break;
+		*/
+	default:
+		sprintf(title,
 				"                     "
 				"Public DOOM - v%i.%i"
 				"                           ",
-				VERSION / 100, VERSION % 100
-			);
-			break;
+				VERSION / 100, VERSION % 100);
+		break;
 	}
 
 	printf("%s\n", title);
@@ -884,27 +869,21 @@ void D_DoomMain(void)
 		// Map name handling.
 		switch (gamemode)
 		{
-			case shareware:
-			case retail:
-			case registered:
-				sprintf(
-					file, "~" DEVMAPS "E%cM%c.wad", myargv[p + 1][0],
-					myargv[p + 2][0]
-				);
-				printf(
-					"Warping to Episode %s, Map %s.\n", myargv[p + 1],
-					myargv[p + 2]
-				);
-				break;
+		case shareware:
+		case retail:
+		case registered:
+			sprintf(file, "~" DEVMAPS "E%cM%c.wad", myargv[p + 1][0], myargv[p + 2][0]);
+			printf("Warping to Episode %s, Map %s.\n", myargv[p + 1], myargv[p + 2]);
+			break;
 
-			case commercial:
-			default:
-				p = atoi(myargv[p + 1]);
-				if (p < 10)
-					sprintf(file, "~" DEVMAPS "cdata/map0%i.wad", p);
-				else
-					sprintf(file, "~" DEVMAPS "cdata/map%i.wad", p);
-				break;
+		case commercial:
+		default:
+			p = atoi(myargv[p + 1]);
+			if (p < 10)
+				sprintf(file, "~" DEVMAPS "cdata/map0%i.wad", p);
+			else
+				sprintf(file, "~" DEVMAPS "cdata/map%i.wad", p);
+			break;
 		}
 		D_AddFile(file);
 	}
@@ -998,18 +977,15 @@ void D_DoomMain(void)
 	{
 		// These are the lumps that will be checked in IWAD,
 		// if any one is not present, execution will be aborted.
-		char name[23][8] = {"e2m1",	  "e2m2",	"e2m3",	   "e2m4",	 "e2m5",
-							"e2m6",	  "e2m7",	"e2m8",	   "e2m9",	 "e3m1",
-							"e3m3",	  "e3m3",	"e3m4",	   "e3m5",	 "e3m6",
-							"e3m7",	  "e3m8",	"e3m9",	   "dphoof", "bfgga0",
-							"heada1", "cybra1", "spida1d1"};
+		char name[23][8]
+			= { "e2m1", "e2m2", "e2m3",	  "e2m4",	"e2m5",	  "e2m6",	"e2m7",	   "e2m8",
+				"e2m9", "e3m1", "e3m3",	  "e3m3",	"e3m4",	  "e3m5",	"e3m6",	   "e3m7",
+				"e3m8", "e3m9", "dphoof", "bfgga0", "heada1", "cybra1", "spida1d1" };
 		int i;
 
 		if (gamemode == shareware)
-			I_Error(
-				"\nYou cannot -file with the shareware "
-				"version. Register!"
-			);
+			I_Error("\nYou cannot -file with the shareware "
+					"version. Register!");
 
 		// Check for fake IWAD with right name,
 		// but w/o all the lumps of the registered version.
@@ -1022,52 +998,46 @@ void D_DoomMain(void)
 	// Iff additonal PWAD files are used, print modified banner
 	if (modifiedgame)
 	{
-		/*m*/ printf(
-			"=================================================================="
-			"=========\n"
-			"ATTENTION:  This version of DOOM has been modified.  If you would "
-			"like to\n"
-			"get a copy of the original game, call 1-800-IDGAMES or see the "
-			"readme file.\n"
-			"        You will not receive technical support for modified "
-			"games.\n"
-			"                      press enter to continue\n"
-			"=================================================================="
-			"=========\n"
-		);
+		/*m*/ printf("=================================================================="
+					 "=========\n"
+					 "ATTENTION:  This version of DOOM has been modified.  If you would "
+					 "like to\n"
+					 "get a copy of the original game, call 1-800-IDGAMES or see the "
+					 "readme file.\n"
+					 "        You will not receive technical support for modified "
+					 "games.\n"
+					 "                      press enter to continue\n"
+					 "=================================================================="
+					 "=========\n");
 		getchar();
 	}
 
 	// Check and print which version is executed.
 	switch (gamemode)
 	{
-		case shareware:
-		case indetermined:
-			printf(
-				"=============================================================="
-				"=============\n"
-				"                                Shareware!\n"
-				"=============================================================="
-				"=============\n"
-			);
-			break;
-		case registered:
-		case retail:
-		case commercial:
-			printf(
-				"=============================================================="
-				"=============\n"
-				"                 Commercial product - do not distribute!\n"
-				"         Please report software piracy to the SPA: "
-				"1-800-388-PIR8\n"
-				"=============================================================="
-				"=============\n"
-			);
-			break;
+	case shareware:
+	case indetermined:
+		printf("=============================================================="
+			   "=============\n"
+			   "                                Shareware!\n"
+			   "=============================================================="
+			   "=============\n");
+		break;
+	case registered:
+	case retail:
+	case commercial:
+		printf("=============================================================="
+			   "=============\n"
+			   "                 Commercial product - do not distribute!\n"
+			   "         Please report software piracy to the SPA: "
+			   "1-800-388-PIR8\n"
+			   "=============================================================="
+			   "=============\n");
+		break;
 
-		default:
-			// Ouch.
-			break;
+	default:
+		// Ouch.
+		break;
 	}
 
 	printf("M_Init: Init miscellaneous info.\n");
@@ -1133,9 +1103,7 @@ void D_DoomMain(void)
 	if (p && p < myargc - 1)
 	{
 		if (M_CheckParm("-cdrom"))
-			sprintf(
-				file, "c:\\doomdata\\" SAVEGAMENAME "%c.dsg", myargv[p + 1][0]
-			);
+			sprintf(file, "c:\\doomdata\\" SAVEGAMENAME "%c.dsg", myargv[p + 1][0]);
 		else
 			sprintf(file, SAVEGAMENAME "%c.dsg", myargv[p + 1][0]);
 		G_LoadGame(file);

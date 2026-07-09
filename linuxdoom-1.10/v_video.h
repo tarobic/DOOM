@@ -50,10 +50,8 @@ extern int usegamma;
 // Allocates buffer screens, call before R_Init.
 void V_Init(void);
 
-void V_CopyRect(
-	int srcx, int srcy, int srcscrn, int width, int height, int destx,
-	int desty, int destscrn
-);
+void V_CopyRect(int srcx, int srcy, int srcscrn, int width, int height, int destx, int desty,
+				int destscrn);
 
 void V_DrawPatch(int x, int y, int scrn, patch_t* patch);
 

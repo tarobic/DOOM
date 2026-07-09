@@ -62,8 +62,8 @@ void Z_ClearZone(memzone_t* zone)
 	memblock_t* block;
 
 	// set the entire zone to one free block
-	zone->blocklist.next = zone->blocklist.prev = block =
-		(memblock_t*)((byte*)zone + sizeof(memzone_t));
+	zone->blocklist.next = zone->blocklist.prev = block
+		= (memblock_t*)((byte*)zone + sizeof(memzone_t));
 
 	zone->blocklist.user = (void*)zone;
 	zone->blocklist.tag = PU_STATIC;
@@ -89,8 +89,8 @@ void Z_Init(void)
 	mainzone->size = size;
 
 	// set the entire zone to one free block
-	mainzone->blocklist.next = mainzone->blocklist.prev = block =
-		(memblock_t*)((byte*)mainzone + sizeof(memzone_t));
+	mainzone->blocklist.next = mainzone->blocklist.prev = block
+		= (memblock_t*)((byte*)mainzone + sizeof(memzone_t));
 
 	mainzone->blocklist.user = (void*)mainzone;
 	mainzone->blocklist.tag = PU_STATIC;
@@ -276,8 +276,7 @@ void Z_FreeTags(int lowtag, int hightag)
 	memblock_t* block;
 	memblock_t* next;
 
-	for (block = mainzone->blocklist.next; block != &mainzone->blocklist;
-		 block = next)
+	for (block = mainzone->blocklist.next; block != &mainzone->blocklist; block = next)
 	{
 		// get link before freeing
 		next = block->next;
@@ -306,10 +305,8 @@ void Z_DumpHeap(int lowtag, int hightag)
 	for (block = mainzone->blocklist.next;; block = block->next)
 	{
 		if (block->tag >= lowtag && block->tag <= hightag)
-			printf(
-				"block:%p    size:%7i    user:%p    tag:%3i\n", block,
-				block->size, block->user, block->tag
-			);
+			printf("block:%p    size:%7i    user:%p    tag:%3i\n", block, block->size, block->user,
+				   block->tag);
 
 		if (block->next == &mainzone->blocklist)
 		{
@@ -339,10 +336,8 @@ void Z_FileDumpHeap(FILE* f)
 
 	for (block = mainzone->blocklist.next;; block = block->next)
 	{
-		fprintf(
-			f, "block:%p    size:%7i    user:%p    tag:%3i\n", block,
-			block->size, block->user, block->tag
-		);
+		fprintf(f, "block:%p    size:%7i    user:%p    tag:%3i\n", block, block->size, block->user,
+				block->tag);
 
 		if (block->next == &mainzone->blocklist)
 		{
@@ -415,8 +410,7 @@ int Z_FreeMemory(void)
 
 	free = 0;
 
-	for (block = mainzone->blocklist.next; block != &mainzone->blocklist;
-		 block = block->next)
+	for (block = mainzone->blocklist.next; block != &mainzone->blocklist; block = block->next)
 	{
 		if (!block->user || block->tag >= PU_PURGELEVEL)
 			free += block->size;

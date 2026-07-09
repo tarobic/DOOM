@@ -98,106 +98,106 @@ int xlatekey(void)
 
 	switch (rc = XKeycodeToKeysym(X_display, X_event.xkey.keycode, 0))
 	{
-		case XK_Left:
-			rc = KEY_LEFTARROW;
-			break;
-		case XK_Right:
-			rc = KEY_RIGHTARROW;
-			break;
-		case XK_Down:
-			rc = KEY_DOWNARROW;
-			break;
-		case XK_Up:
-			rc = KEY_UPARROW;
-			break;
-		case XK_Escape:
-			rc = KEY_ESCAPE;
-			break;
-		case XK_Return:
-			rc = KEY_ENTER;
-			break;
-		case XK_Tab:
-			rc = KEY_TAB;
-			break;
-		case XK_F1:
-			rc = KEY_F1;
-			break;
-		case XK_F2:
-			rc = KEY_F2;
-			break;
-		case XK_F3:
-			rc = KEY_F3;
-			break;
-		case XK_F4:
-			rc = KEY_F4;
-			break;
-		case XK_F5:
-			rc = KEY_F5;
-			break;
-		case XK_F6:
-			rc = KEY_F6;
-			break;
-		case XK_F7:
-			rc = KEY_F7;
-			break;
-		case XK_F8:
-			rc = KEY_F8;
-			break;
-		case XK_F9:
-			rc = KEY_F9;
-			break;
-		case XK_F10:
-			rc = KEY_F10;
-			break;
-		case XK_F11:
-			rc = KEY_F11;
-			break;
-		case XK_F12:
-			rc = KEY_F12;
-			break;
+	case XK_Left:
+		rc = KEY_LEFTARROW;
+		break;
+	case XK_Right:
+		rc = KEY_RIGHTARROW;
+		break;
+	case XK_Down:
+		rc = KEY_DOWNARROW;
+		break;
+	case XK_Up:
+		rc = KEY_UPARROW;
+		break;
+	case XK_Escape:
+		rc = KEY_ESCAPE;
+		break;
+	case XK_Return:
+		rc = KEY_ENTER;
+		break;
+	case XK_Tab:
+		rc = KEY_TAB;
+		break;
+	case XK_F1:
+		rc = KEY_F1;
+		break;
+	case XK_F2:
+		rc = KEY_F2;
+		break;
+	case XK_F3:
+		rc = KEY_F3;
+		break;
+	case XK_F4:
+		rc = KEY_F4;
+		break;
+	case XK_F5:
+		rc = KEY_F5;
+		break;
+	case XK_F6:
+		rc = KEY_F6;
+		break;
+	case XK_F7:
+		rc = KEY_F7;
+		break;
+	case XK_F8:
+		rc = KEY_F8;
+		break;
+	case XK_F9:
+		rc = KEY_F9;
+		break;
+	case XK_F10:
+		rc = KEY_F10;
+		break;
+	case XK_F11:
+		rc = KEY_F11;
+		break;
+	case XK_F12:
+		rc = KEY_F12;
+		break;
 
-		case XK_BackSpace:
-		case XK_Delete:
-			rc = KEY_BACKSPACE;
-			break;
+	case XK_BackSpace:
+	case XK_Delete:
+		rc = KEY_BACKSPACE;
+		break;
 
-		case XK_Pause:
-			rc = KEY_PAUSE;
-			break;
+	case XK_Pause:
+		rc = KEY_PAUSE;
+		break;
 
-		case XK_KP_Equal:
-		case XK_equal:
-			rc = KEY_EQUALS;
-			break;
+	case XK_KP_Equal:
+	case XK_equal:
+		rc = KEY_EQUALS;
+		break;
 
-		case XK_KP_Subtract:
-		case XK_minus:
-			rc = KEY_MINUS;
-			break;
+	case XK_KP_Subtract:
+	case XK_minus:
+		rc = KEY_MINUS;
+		break;
 
-		case XK_Shift_L:
-		case XK_Shift_R:
-			rc = KEY_RSHIFT;
-			break;
+	case XK_Shift_L:
+	case XK_Shift_R:
+		rc = KEY_RSHIFT;
+		break;
 
-		case XK_Control_L:
-		case XK_Control_R:
-			rc = KEY_RCTRL;
-			break;
+	case XK_Control_L:
+	case XK_Control_R:
+		rc = KEY_RCTRL;
+		break;
 
-		case XK_Alt_L:
-		case XK_Meta_L:
-		case XK_Alt_R:
-		case XK_Meta_R:
-			rc = KEY_RALT;
-			break;
+	case XK_Alt_L:
+	case XK_Meta_L:
+	case XK_Alt_R:
+	case XK_Meta_R:
+		rc = KEY_RALT;
+		break;
 
-		default:
-			if (rc >= XK_space && rc <= XK_asciitilde)
-				rc = rc - XK_space + ' ';
-			if (rc >= 'A' && rc <= 'Z')
-				rc = rc - 'A' + 'a';
-			break;
+	default:
+		if (rc >= XK_space && rc <= XK_asciitilde)
+			rc = rc - XK_space + ' ';
+		if (rc >= 'A' && rc <= 'Z')
+			rc = rc - 'A' + 'a';
+		break;
 	}
 
 	return rc;
@@ -238,78 +238,75 @@ void I_GetEvent(void)
 	XNextEvent(X_display, &X_event);
 	switch (X_event.type)
 	{
-		case KeyPress:
-			event.type = ev_keydown;
-			event.data1 = xlatekey();
-			D_PostEvent(&event);
-			// fprintf(stderr, "k");
-			break;
-		case KeyRelease:
-			event.type = ev_keyup;
-			event.data1 = xlatekey();
-			D_PostEvent(&event);
-			// fprintf(stderr, "ku");
-			break;
-		case ButtonPress:
-			event.type = ev_mouse;
-			event.data1 = (X_event.xbutton.state & Button1Mask) |
-						  (X_event.xbutton.state & Button2Mask ? 2 : 0) |
-						  (X_event.xbutton.state & Button3Mask ? 4 : 0) |
-						  (X_event.xbutton.button == Button1) |
-						  (X_event.xbutton.button == Button2 ? 2 : 0) |
-						  (X_event.xbutton.button == Button3 ? 4 : 0);
-			event.data2 = event.data3 = 0;
-			D_PostEvent(&event);
-			// fprintf(stderr, "b");
-			break;
-		case ButtonRelease:
-			event.type = ev_mouse;
-			event.data1 = (X_event.xbutton.state & Button1Mask) |
-						  (X_event.xbutton.state & Button2Mask ? 2 : 0) |
-						  (X_event.xbutton.state & Button3Mask ? 4 : 0);
-			// suggest parentheses around arithmetic in operand of |
-			event.data1 = event.data1 ^
-						  (X_event.xbutton.button == Button1 ? 1 : 0) ^
-						  (X_event.xbutton.button == Button2 ? 2 : 0) ^
-						  (X_event.xbutton.button == Button3 ? 4 : 0);
-			event.data2 = event.data3 = 0;
-			D_PostEvent(&event);
-			// fprintf(stderr, "bu");
-			break;
-		case MotionNotify:
-			event.type = ev_mouse;
-			event.data1 = (X_event.xmotion.state & Button1Mask) |
-						  (X_event.xmotion.state & Button2Mask ? 2 : 0) |
-						  (X_event.xmotion.state & Button3Mask ? 4 : 0);
-			event.data2 = (X_event.xmotion.x - lastmousex) << 2;
-			event.data3 = (lastmousey - X_event.xmotion.y) << 2;
+	case KeyPress:
+		event.type = ev_keydown;
+		event.data1 = xlatekey();
+		D_PostEvent(&event);
+		// fprintf(stderr, "k");
+		break;
+	case KeyRelease:
+		event.type = ev_keyup;
+		event.data1 = xlatekey();
+		D_PostEvent(&event);
+		// fprintf(stderr, "ku");
+		break;
+	case ButtonPress:
+		event.type = ev_mouse;
+		event.data1
+			= (X_event.xbutton.state & Button1Mask) | (X_event.xbutton.state & Button2Mask ? 2 : 0)
+			| (X_event.xbutton.state & Button3Mask ? 4 : 0) | (X_event.xbutton.button == Button1)
+			| (X_event.xbutton.button == Button2 ? 2 : 0)
+			| (X_event.xbutton.button == Button3 ? 4 : 0);
+		event.data2 = event.data3 = 0;
+		D_PostEvent(&event);
+		// fprintf(stderr, "b");
+		break;
+	case ButtonRelease:
+		event.type = ev_mouse;
+		event.data1 = (X_event.xbutton.state & Button1Mask)
+					| (X_event.xbutton.state & Button2Mask ? 2 : 0)
+					| (X_event.xbutton.state & Button3Mask ? 4 : 0);
+		// suggest parentheses around arithmetic in operand of |
+		event.data1 = event.data1 ^ (X_event.xbutton.button == Button1 ? 1 : 0)
+					^ (X_event.xbutton.button == Button2 ? 2 : 0)
+					^ (X_event.xbutton.button == Button3 ? 4 : 0);
+		event.data2 = event.data3 = 0;
+		D_PostEvent(&event);
+		// fprintf(stderr, "bu");
+		break;
+	case MotionNotify:
+		event.type = ev_mouse;
+		event.data1 = (X_event.xmotion.state & Button1Mask)
+					| (X_event.xmotion.state & Button2Mask ? 2 : 0)
+					| (X_event.xmotion.state & Button3Mask ? 4 : 0);
+		event.data2 = (X_event.xmotion.x - lastmousex) << 2;
+		event.data3 = (lastmousey - X_event.xmotion.y) << 2;
 
-			if (event.data2 || event.data3)
+		if (event.data2 || event.data3)
+		{
+			lastmousex = X_event.xmotion.x;
+			lastmousey = X_event.xmotion.y;
+			if (X_event.xmotion.x != X_width / 2 && X_event.xmotion.y != X_height / 2)
 			{
-				lastmousex = X_event.xmotion.x;
-				lastmousey = X_event.xmotion.y;
-				if (X_event.xmotion.x != X_width / 2 &&
-					X_event.xmotion.y != X_height / 2)
-				{
-					D_PostEvent(&event);
-					// fprintf(stderr, "m");
-					mousemoved = false;
-				}
-				else
-				{
-					mousemoved = true;
-				}
+				D_PostEvent(&event);
+				// fprintf(stderr, "m");
+				mousemoved = false;
 			}
-			break;
+			else
+			{
+				mousemoved = true;
+			}
+		}
+		break;
 
-		case Expose:
-		case ConfigureNotify:
-			break;
+	case Expose:
+	case ConfigureNotify:
+		break;
 
-		default:
-			if (doShm && X_event.type == X_shmeventtype)
-				shmFinished = true;
-			break;
+	default:
+		if (doShm && X_event.type == X_shmeventtype)
+			shmFinished = true;
+		break;
 	}
 }
 
@@ -328,9 +325,7 @@ Cursor createnullcursor(Display* display, Window root)
 	dummycolour.pixel = 0;
 	dummycolour.red = 0;
 	dummycolour.flags = 04;
-	cursor = XCreatePixmapCursor(
-		display, cursormask, cursormask, &dummycolour, &dummycolour, 0, 0
-	);
+	cursor = XCreatePixmapCursor(display, cursormask, cursormask, &dummycolour, &dummycolour, 0, 0);
 	XFreePixmap(display, cursormask);
 	XFreeGC(display, gc);
 	return cursor;
@@ -354,10 +349,7 @@ void I_StartTic(void)
 	{
 		if (!--doPointerWarp)
 		{
-			XWarpPointer(
-				X_display, None, X_mainWindow, 0, 0, 0, 0, X_width / 2,
-				X_height / 2
-			);
+			XWarpPointer(X_display, None, X_mainWindow, 0, 0, 0, 0, X_width / 2, X_height / 2);
 
 			doPointerWarp = POINTER_WARP_COUNTDOWN;
 		}
@@ -420,12 +412,10 @@ void I_FinishUpdate(void)
 			do
 			{
 				fouripixels = *ilineptr++;
-				twoopixels = (fouripixels & 0xff000000) |
-							 ((fouripixels >> 8) & 0xffff00) |
-							 ((fouripixels >> 16) & 0xff);
-				twomoreopixels = ((fouripixels << 16) & 0xff000000) |
-								 ((fouripixels << 8) & 0xffff00) |
-								 (fouripixels & 0xff);
+				twoopixels = (fouripixels & 0xff000000) | ((fouripixels >> 8) & 0xffff00)
+						   | ((fouripixels >> 16) & 0xff);
+				twomoreopixels = ((fouripixels << 16) & 0xff000000)
+							   | ((fouripixels << 8) & 0xffff00) | (fouripixels & 0xff);
 #ifdef __BIG_ENDIAN__
 				*olineptrs[0]++ = twoopixels;
 				*olineptrs[1]++ = twoopixels;
@@ -461,15 +451,12 @@ void I_FinishUpdate(void)
 			do
 			{
 				fouripixels = *ilineptr++;
-				fouropixels[0] = (fouripixels & 0xff000000) |
-								 ((fouripixels >> 8) & 0xff0000) |
-								 ((fouripixels >> 16) & 0xffff);
-				fouropixels[1] = ((fouripixels << 8) & 0xff000000) |
-								 (fouripixels & 0xffff00) |
-								 ((fouripixels >> 8) & 0xff);
-				fouropixels[2] = ((fouripixels << 16) & 0xffff0000) |
-								 ((fouripixels << 8) & 0xff00) |
-								 (fouripixels & 0xff);
+				fouropixels[0] = (fouripixels & 0xff000000) | ((fouripixels >> 8) & 0xff0000)
+							   | ((fouripixels >> 16) & 0xffff);
+				fouropixels[1] = ((fouripixels << 8) & 0xff000000) | (fouripixels & 0xffff00)
+							   | ((fouripixels >> 8) & 0xff);
+				fouropixels[2] = ((fouripixels << 16) & 0xffff0000) | ((fouripixels << 8) & 0xff00)
+							   | (fouripixels & 0xff);
 #ifdef __BIG_ENDIAN__
 				*olineptrs[0]++ = fouropixels[0];
 				*olineptrs[1]++ = fouropixels[0];
@@ -506,10 +493,8 @@ void I_FinishUpdate(void)
 
 	if (doShm)
 	{
-		if (!XShmPutImage(
-				X_display, X_mainWindow, X_gc, image, 0, 0, 0, 0, X_width,
-				X_height, True
-			))
+		if (!XShmPutImage(X_display, X_mainWindow, X_gc, image, 0, 0, 0, 0, X_width, X_height,
+						  True))
 			I_Error("XShmPutImage() failed\n");
 
 		// wait for it to finish and processes all input events
@@ -522,9 +507,7 @@ void I_FinishUpdate(void)
 	else
 	{
 		// draw the image
-		XPutImage(
-			X_display, X_mainWindow, X_gc, image, 0, 0, 0, 0, X_width, X_height
-		);
+		XPutImage(X_display, X_mainWindow, X_gc, image, 0, 0, 0, 0, X_width, X_height);
 
 		// sync up with server
 		XSync(X_display, False);
@@ -619,12 +602,10 @@ void grabsharedmemory(int size)
 			{
 				if (shminfo.shm_nattch)
 				{
-					fprintf(
-						stderr,
-						"User %d appears to be running "
-						"DOOM.  Is that wise?\n",
-						shminfo.shm_cpid
-					);
+					fprintf(stderr,
+							"User %d appears to be running "
+							"DOOM.  Is that wise?\n",
+							shminfo.shm_cpid);
 					key++;
 				}
 				else
@@ -633,14 +614,9 @@ void grabsharedmemory(int size)
 					{
 						rc = shmctl(id, IPC_RMID, 0);
 						if (!rc)
-							fprintf(
-								stderr,
-								"Was able to kill my old shared memory\n"
-							);
+							fprintf(stderr, "Was able to kill my old shared memory\n");
 						else
-							I_Error(
-								"Was NOT able to kill my old shared memory"
-							);
+							I_Error("Was NOT able to kill my old shared memory");
 
 						id = shmget((key_t)key, size, IPC_CREAT | 0777);
 						if (id == -1)
@@ -652,21 +628,16 @@ void grabsharedmemory(int size)
 					}
 					if (size >= shminfo.shm_segsz)
 					{
-						fprintf(
-							stderr, "will use %d's stale shared memory\n",
-							shminfo.shm_cpid
-						);
+						fprintf(stderr, "will use %d's stale shared memory\n", shminfo.shm_cpid);
 						break;
 					}
 					else
 					{
-						fprintf(
-							stderr,
-							"warning: can't use stale "
-							"shared memory belonging to id %d, "
-							"key=0x%x\n",
-							shminfo.shm_cpid, key
-						);
+						fprintf(stderr,
+								"warning: can't use stale "
+								"shared memory belonging to id %d, "
+								"key=0x%x\n",
+								shminfo.shm_cpid, key);
 						key++;
 					}
 				}
@@ -690,10 +661,8 @@ void grabsharedmemory(int size)
 
 	if (!pollution)
 	{
-		I_Error(
-			"Sorry, system too polluted with stale "
-			"shared memory segments.\n"
-		);
+		I_Error("Sorry, system too polluted with stale "
+				"shared memory segments.\n");
 	}
 
 	X_shminfo.shmid = id;
@@ -809,33 +778,27 @@ void I_InitGraphics(void)
 	fprintf(stderr, "Using MITSHM extension\n");
 
 	// create the colormap
-	X_cmap = XCreateColormap(
-		X_display, RootWindow(X_display, X_screen), X_visual, AllocAll
-	);
+	X_cmap = XCreateColormap(X_display, RootWindow(X_display, X_screen), X_visual, AllocAll);
 
 	// setup attributes for main window
 	attribmask = CWEventMask | CWColormap | CWBorderPixel;
-	attribs.event_mask =
-		KeyPressMask |
-		KeyReleaseMask
-		// | PointerMotionMask | ButtonPressMask | ButtonReleaseMask
-		| ExposureMask;
+	attribs.event_mask = KeyPressMask
+					   | KeyReleaseMask
+					   // | PointerMotionMask | ButtonPressMask | ButtonReleaseMask
+					   | ExposureMask;
 
 	attribs.colormap = X_cmap;
 	attribs.border_pixel = 0;
 
 	// create the main window
-	X_mainWindow = XCreateWindow(
-		X_display, RootWindow(X_display, X_screen), x, y, X_width, X_height,
-		0, // borderwidth
-		8, // depth
-		InputOutput, X_visual, attribmask, &attribs
-	);
+	X_mainWindow
+		= XCreateWindow(X_display, RootWindow(X_display, X_screen), x, y, X_width, X_height,
+						0, // borderwidth
+						8, // depth
+						InputOutput, X_visual, attribmask, &attribs);
 
 	XInstallColormap(X_display, X_cmap);
-	XDefineCursor(
-		X_display, X_mainWindow, createnullcursor(X_display, X_mainWindow)
-	);
+	XDefineCursor(X_display, X_mainWindow, createnullcursor(X_display, X_mainWindow));
 
 	// create the GC
 	valuemask = GCGraphicsExposures;
@@ -858,20 +821,16 @@ void I_InitGraphics(void)
 
 	// grabs the pointer so it is restricted to this window
 	if (grabMouse)
-		XGrabPointer(
-			X_display, X_mainWindow, True,
-			ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-			GrabModeAsync, GrabModeAsync, X_mainWindow, None, CurrentTime
-		);
+		XGrabPointer(X_display, X_mainWindow, True,
+					 ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+					 GrabModeAsync, X_mainWindow, None, CurrentTime);
 
 	if (doShm)
 	{
 		X_shmeventtype = XShmGetEventBase(X_display) + ShmCompletion;
 
 		// create the image
-		image = XShmCreateImage(
-			X_display, X_visual, 8, ZPixmap, 0, &X_shminfo, X_width, X_height
-		);
+		image = XShmCreateImage(X_display, X_visual, 8, ZPixmap, 0, &X_shminfo, X_width, X_height);
 
 		grabsharedmemory(image->bytes_per_line * image->height);
 
@@ -900,10 +859,8 @@ void I_InitGraphics(void)
 	}
 	else
 	{
-		image = XCreateImage(
-			X_display, X_visual, 8, ZPixmap, 0,
-			(char*)malloc(X_width * X_height), X_width, X_height, 8, X_width
-		);
+		image = XCreateImage(X_display, X_visual, 8, ZPixmap, 0, (char*)malloc(X_width * X_height),
+							 X_width, X_height, 8, X_width);
 	}
 
 	if (multiply == 1)

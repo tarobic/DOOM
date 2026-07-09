@@ -21,8 +21,7 @@
 //
 //-----------------------------------------------------------------------------
 
-static const char rcsid[] =
-	"$Id: wi_stuff.c,v 1.7 1997/02/03 22:45:13 b1 Exp $";
+static const char rcsid[] = "$Id: wi_stuff.c,v 1.7 1997/02/03 22:45:13 b1 Exp $";
 
 #include <stdio.h>
 
@@ -167,41 +166,41 @@ typedef struct
 static point_t lnodes[NUMEPISODES][NUMMAPS] = {
 	// Episode 0 World Map
 	{
-		{185, 164}, // location of level 0 (CJ)
-		{148, 143}, // location of level 1 (CJ)
-		{69, 122},	// location of level 2 (CJ)
-		{209, 102}, // location of level 3 (CJ)
-		{116, 89},	// location of level 4 (CJ)
-		{166, 55},	// location of level 5 (CJ)
-		{71, 56},	// location of level 6 (CJ)
-		{135, 29},	// location of level 7 (CJ)
-		{71, 24}	// location of level 8 (CJ)
+		{ 185, 164 }, // location of level 0 (CJ)
+		{ 148, 143 }, // location of level 1 (CJ)
+		{ 69, 122 },  // location of level 2 (CJ)
+		{ 209, 102 }, // location of level 3 (CJ)
+		{ 116, 89 },  // location of level 4 (CJ)
+		{ 166, 55 },  // location of level 5 (CJ)
+		{ 71, 56 },	  // location of level 6 (CJ)
+		{ 135, 29 },  // location of level 7 (CJ)
+		{ 71, 24 }	  // location of level 8 (CJ)
 	},
 
 	// Episode 1 World Map should go here
 	{
-		{254, 25},	// location of level 0 (CJ)
-		{97, 50},	// location of level 1 (CJ)
-		{188, 64},	// location of level 2 (CJ)
-		{128, 78},	// location of level 3 (CJ)
-		{214, 92},	// location of level 4 (CJ)
-		{133, 130}, // location of level 5 (CJ)
-		{208, 136}, // location of level 6 (CJ)
-		{148, 140}, // location of level 7 (CJ)
-		{235, 158}	// location of level 8 (CJ)
+		{ 254, 25 },  // location of level 0 (CJ)
+		{ 97, 50 },	  // location of level 1 (CJ)
+		{ 188, 64 },  // location of level 2 (CJ)
+		{ 128, 78 },  // location of level 3 (CJ)
+		{ 214, 92 },  // location of level 4 (CJ)
+		{ 133, 130 }, // location of level 5 (CJ)
+		{ 208, 136 }, // location of level 6 (CJ)
+		{ 148, 140 }, // location of level 7 (CJ)
+		{ 235, 158 }  // location of level 8 (CJ)
 	},
 
 	// Episode 2 World Map should go here
 	{
-		{156, 168}, // location of level 0 (CJ)
-		{48, 154},	// location of level 1 (CJ)
-		{174, 95},	// location of level 2 (CJ)
-		{265, 75},	// location of level 3 (CJ)
-		{130, 48},	// location of level 4 (CJ)
-		{279, 23},	// location of level 5 (CJ)
-		{198, 48},	// location of level 6 (CJ)
-		{140, 25},	// location of level 7 (CJ)
-		{281, 136}	// location of level 8 (CJ)
+		{ 156, 168 }, // location of level 0 (CJ)
+		{ 48, 154 },  // location of level 1 (CJ)
+		{ 174, 95 },  // location of level 2 (CJ)
+		{ 265, 75 },  // location of level 3 (CJ)
+		{ 130, 48 },  // location of level 4 (CJ)
+		{ 279, 23 },  // location of level 5 (CJ)
+		{ 198, 48 },  // location of level 6 (CJ)
+		{ 140, 25 },  // location of level 7 (CJ)
+		{ 281, 136 }  // location of level 8 (CJ)
 	}
 
 };
@@ -212,48 +211,33 @@ static point_t lnodes[NUMEPISODES][NUMMAPS] = {
 //  as they replace 320x200 full screen frames.
 //
 static anim_t epsd0animinfo[] = {
-	{ANIM_ALWAYS, TICRATE / 3, 3, {224, 104}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {184, 160}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {112, 136}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {72, 112}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {88, 96}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {64, 48}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {192, 40}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {136, 16}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {80, 16}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {64, 24}}
+	{ ANIM_ALWAYS, TICRATE / 3, 3, { 224, 104 } }, { ANIM_ALWAYS, TICRATE / 3, 3, { 184, 160 } },
+	{ ANIM_ALWAYS, TICRATE / 3, 3, { 112, 136 } }, { ANIM_ALWAYS, TICRATE / 3, 3, { 72, 112 } },
+	{ ANIM_ALWAYS, TICRATE / 3, 3, { 88, 96 } },   { ANIM_ALWAYS, TICRATE / 3, 3, { 64, 48 } },
+	{ ANIM_ALWAYS, TICRATE / 3, 3, { 192, 40 } },  { ANIM_ALWAYS, TICRATE / 3, 3, { 136, 16 } },
+	{ ANIM_ALWAYS, TICRATE / 3, 3, { 80, 16 } },   { ANIM_ALWAYS, TICRATE / 3, 3, { 64, 24 } }
 };
 
-static anim_t epsd1animinfo[] = {
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 1},
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 2},
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 3},
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 4},
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 5},
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 6},
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 7},
-	{ANIM_LEVEL, TICRATE / 3, 3, {192, 144}, 8},
-	{ANIM_LEVEL, TICRATE / 3, 1, {128, 136}, 8}
-};
+static anim_t epsd1animinfo[] = { { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 1 },
+								  { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 2 },
+								  { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 3 },
+								  { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 4 },
+								  { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 5 },
+								  { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 6 },
+								  { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 7 },
+								  { ANIM_LEVEL, TICRATE / 3, 3, { 192, 144 }, 8 },
+								  { ANIM_LEVEL, TICRATE / 3, 1, { 128, 136 }, 8 } };
 
-static anim_t epsd2animinfo[] = {
-	{ANIM_ALWAYS, TICRATE / 3, 3, {104, 168}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {40, 136}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {160, 96}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {104, 80}},
-	{ANIM_ALWAYS, TICRATE / 3, 3, {120, 32}},
-	{ANIM_ALWAYS, TICRATE / 4, 3, {40, 0}}
-};
+static anim_t epsd2animinfo[]
+	= { { ANIM_ALWAYS, TICRATE / 3, 3, { 104, 168 } }, { ANIM_ALWAYS, TICRATE / 3, 3, { 40, 136 } },
+		{ ANIM_ALWAYS, TICRATE / 3, 3, { 160, 96 } },  { ANIM_ALWAYS, TICRATE / 3, 3, { 104, 80 } },
+		{ ANIM_ALWAYS, TICRATE / 3, 3, { 120, 32 } },  { ANIM_ALWAYS, TICRATE / 4, 3, { 40, 0 } } };
 
-static int NUMANIMS[NUMEPISODES] = {
-	sizeof(epsd0animinfo) / sizeof(anim_t),
-	sizeof(epsd1animinfo) / sizeof(anim_t),
-	sizeof(epsd2animinfo) / sizeof(anim_t)
-};
+static int NUMANIMS[NUMEPISODES]
+	= { sizeof(epsd0animinfo) / sizeof(anim_t), sizeof(epsd1animinfo) / sizeof(anim_t),
+		sizeof(epsd2animinfo) / sizeof(anim_t) };
 
-static anim_t* anims[NUMEPISODES] = {
-	epsd0animinfo, epsd1animinfo, epsd2animinfo
-};
+static anim_t* anims[NUMEPISODES] = { epsd0animinfo, epsd1animinfo, epsd2animinfo };
 
 //
 // GENERAL DATA
@@ -398,10 +382,7 @@ void WI_drawLF(void)
 	int y = WI_TITLEY;
 
 	// draw <LevelName>
-	V_DrawPatch(
-		(SCREENWIDTH - SHORT(lnames[wbs->last]->width)) / 2, y, FB,
-		lnames[wbs->last]
-	);
+	V_DrawPatch((SCREENWIDTH - SHORT(lnames[wbs->last]->width)) / 2, y, FB, lnames[wbs->last]);
 
 	// draw "Finished!"
 	y += (5 * SHORT(lnames[wbs->last]->height)) / 4;
@@ -420,10 +401,7 @@ void WI_drawEL(void)
 	// draw level
 	y += (5 * SHORT(lnames[wbs->next]->height)) / 4;
 
-	V_DrawPatch(
-		(SCREENWIDTH - SHORT(lnames[wbs->next]->width)) / 2, y, FB,
-		lnames[wbs->next]
-	);
+	V_DrawPatch((SCREENWIDTH - SHORT(lnames[wbs->next]->width)) / 2, y, FB, lnames[wbs->next]);
 }
 
 void WI_drawOnLnode(int n, patch_t* c[])
@@ -443,8 +421,7 @@ void WI_drawOnLnode(int n, patch_t* c[])
 		right = left + SHORT(c[i]->width);
 		bottom = top + SHORT(c[i]->height);
 
-		if (left >= 0 && right < SCREENWIDTH && top >= 0 &&
-			bottom < SCREENHEIGHT)
+		if (left >= 0 && right < SCREENWIDTH && top >= 0 && bottom < SCREENHEIGHT)
 		{
 			fits = true;
 		}
@@ -512,34 +489,33 @@ void WI_updateAnimatedBack(void)
 		{
 			switch (a->type)
 			{
-				case ANIM_ALWAYS:
-					if (++a->ctr >= a->nanims)
-						a->ctr = 0;
-					a->nexttic = bcnt + a->period;
-					break;
+			case ANIM_ALWAYS:
+				if (++a->ctr >= a->nanims)
+					a->ctr = 0;
+				a->nexttic = bcnt + a->period;
+				break;
 
-				case ANIM_RANDOM:
+			case ANIM_RANDOM:
+				a->ctr++;
+				if (a->ctr == a->nanims)
+				{
+					a->ctr = -1;
+					a->nexttic = bcnt + a->data2 + (M_Random() % a->data1);
+				}
+				else
+					a->nexttic = bcnt + a->period;
+				break;
+
+			case ANIM_LEVEL:
+				// gawd-awful hack for level anims
+				if (!(state == StatCount && i == 7) && wbs->next == a->data1)
+				{
 					a->ctr++;
 					if (a->ctr == a->nanims)
-					{
-						a->ctr = -1;
-						a->nexttic = bcnt + a->data2 + (M_Random() % a->data1);
-					}
-					else
-						a->nexttic = bcnt + a->period;
-					break;
-
-				case ANIM_LEVEL:
-					// gawd-awful hack for level anims
-					if (!(state == StatCount && i == 7) &&
-						wbs->next == a->data1)
-					{
-						a->ctr++;
-						if (a->ctr == a->nanims)
-							a->ctr--;
-						a->nexttic = bcnt + a->period;
-					}
-					break;
+						a->ctr--;
+					a->nexttic = bcnt + a->period;
+				}
+				break;
 			}
 		}
 	}
@@ -920,10 +896,7 @@ void WI_drawDeathmatchStats(void)
 	WI_drawLF();
 
 	// draw stat titles (top line)
-	V_DrawPatch(
-		DM_TOTALSX - SHORT(total->width) / 2, DM_MATRIXY - WI_SPACINGY + 10, FB,
-		total
-	);
+	V_DrawPatch(DM_TOTALSX - SHORT(total->width) / 2, DM_MATRIXY - WI_SPACINGY + 10, FB, total);
 
 	V_DrawPatch(DM_KILLERSX, DM_KILLERSY, FB, killers);
 	V_DrawPatch(DM_VICTIMSX, DM_VICTIMSY, FB, victims);
@@ -936,18 +909,13 @@ void WI_drawDeathmatchStats(void)
 	{
 		if (playeringame[i])
 		{
-			V_DrawPatch(
-				x - SHORT(p[i]->width) / 2, DM_MATRIXY - WI_SPACINGY, FB, p[i]
-			);
+			V_DrawPatch(x - SHORT(p[i]->width) / 2, DM_MATRIXY - WI_SPACINGY, FB, p[i]);
 
 			V_DrawPatch(DM_MATRIXX - SHORT(p[i]->width) / 2, y, FB, p[i]);
 
 			if (i == me)
 			{
-				V_DrawPatch(
-					x - SHORT(p[i]->width) / 2, DM_MATRIXY - WI_SPACINGY, FB,
-					bstar
-				);
+				V_DrawPatch(x - SHORT(p[i]->width) / 2, DM_MATRIXY - WI_SPACINGY, FB, bstar);
 
 				V_DrawPatch(DM_MATRIXX - SHORT(p[i]->width) / 2, y, FB, star);
 			}
@@ -1182,24 +1150,14 @@ void WI_drawNetgameStats(void)
 	WI_drawLF();
 
 	// draw stat titles (top line)
-	V_DrawPatch(
-		NG_STATSX + NG_SPACINGX - SHORT(kills->width), NG_STATSY, FB, kills
-	);
+	V_DrawPatch(NG_STATSX + NG_SPACINGX - SHORT(kills->width), NG_STATSY, FB, kills);
 
-	V_DrawPatch(
-		NG_STATSX + 2 * NG_SPACINGX - SHORT(items->width), NG_STATSY, FB, items
-	);
+	V_DrawPatch(NG_STATSX + 2 * NG_SPACINGX - SHORT(items->width), NG_STATSY, FB, items);
 
-	V_DrawPatch(
-		NG_STATSX + 3 * NG_SPACINGX - SHORT(secret->width), NG_STATSY, FB,
-		secret
-	);
+	V_DrawPatch(NG_STATSX + 3 * NG_SPACINGX - SHORT(secret->width), NG_STATSY, FB, secret);
 
 	if (dofrags)
-		V_DrawPatch(
-			NG_STATSX + 4 * NG_SPACINGX - SHORT(frags->width), NG_STATSY, FB,
-			frags
-		);
+		V_DrawPatch(NG_STATSX + 4 * NG_SPACINGX - SHORT(frags->width), NG_STATSY, FB, frags);
 
 	// draw stats
 	y = NG_STATSY + SHORT(kills->height);
@@ -1430,22 +1388,22 @@ void WI_Ticker(void)
 
 	switch (state)
 	{
-		case StatCount:
-			if (deathmatch)
-				WI_updateDeathmatchStats();
-			else if (netgame)
-				WI_updateNetgameStats();
-			else
-				WI_updateStats();
-			break;
+	case StatCount:
+		if (deathmatch)
+			WI_updateDeathmatchStats();
+		else if (netgame)
+			WI_updateNetgameStats();
+		else
+			WI_updateStats();
+		break;
 
-		case ShowNextLoc:
-			WI_updateShowNextLoc();
-			break;
+	case ShowNextLoc:
+		WI_updateShowNextLoc();
+		break;
 
-		case NoState:
-			WI_updateNoState();
-			break;
+	case NoState:
+		WI_updateNoState();
+		break;
 	}
 }
 
@@ -1684,22 +1642,22 @@ void WI_Drawer(void)
 {
 	switch (state)
 	{
-		case StatCount:
-			if (deathmatch)
-				WI_drawDeathmatchStats();
-			else if (netgame)
-				WI_drawNetgameStats();
-			else
-				WI_drawStats();
-			break;
+	case StatCount:
+		if (deathmatch)
+			WI_drawDeathmatchStats();
+		else if (netgame)
+			WI_drawNetgameStats();
+		else
+			WI_drawStats();
+		break;
 
-		case ShowNextLoc:
-			WI_drawShowNextLoc();
-			break;
+	case ShowNextLoc:
+		WI_drawShowNextLoc();
+		break;
 
-		case NoState:
-			WI_drawNoState();
-			break;
+	case NoState:
+		WI_drawNoState();
+		break;
 	}
 }
 

@@ -301,18 +301,18 @@ void P_LoadThings(int lump)
 		{
 			switch (mt->type)
 			{
-				case 68: // Arachnotron
-				case 64: // Archvile
-				case 88: // Boss Brain
-				case 89: // Boss Shooter
-				case 69: // Hell Knight
-				case 67: // Mancubus
-				case 71: // Pain Elemental
-				case 65: // Former Human Commando
-				case 66: // Revenant
-				case 84: // Wolf SS
-					spawn = false;
-					break;
+			case 68: // Arachnotron
+			case 64: // Archvile
+			case 88: // Boss Brain
+			case 89: // Boss Shooter
+			case 69: // Hell Knight
+			case 67: // Mancubus
+			case 71: // Pain Elemental
+			case 65: // Former Human Commando
+			case 66: // Revenant
+			case 84: // Wolf SS
+				spawn = false;
+				break;
 			}
 		}
 		if (spawn == false)
@@ -565,8 +565,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 	wminfo.partime = 180;
 	for (i = 0; i < MAXPLAYERS; i++)
 	{
-		players[i].killcount = players[i].secretcount = players[i].itemcount =
-			0;
+		players[i].killcount = players[i].secretcount = players[i].itemcount = 0;
 	}
 
 	// Initial height of PointOfView

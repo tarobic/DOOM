@@ -20,8 +20,7 @@
 //
 //-----------------------------------------------------------------------------
 
-static const char rcsid[] =
-	"$Id: p_ceilng.c,v 1.4 1997/02/03 16:47:53 b1 Exp $";
+static const char rcsid[] = "$Id: p_ceilng.c,v 1.4 1997/02/03 16:47:53 b1 Exp $";
 
 #include "doomdef.h"
 #include "p_local.h"
@@ -52,115 +51,103 @@ void T_MoveCeiling(ceiling_t* ceiling)
 
 	switch (ceiling->direction)
 	{
-		case 0:
-			// IN STASIS
-			break;
-		case 1:
-			// UP
-			res = T_MovePlane(
-				ceiling->sector, ceiling->speed, ceiling->topheight, false, 1,
-				ceiling->direction
-			);
+	case 0:
+		// IN STASIS
+		break;
+	case 1:
+		// UP
+		res = T_MovePlane(ceiling->sector, ceiling->speed, ceiling->topheight, false, 1,
+						  ceiling->direction);
 
-			if (!(leveltime & 7))
+		if (!(leveltime & 7))
+		{
+			switch (ceiling->type)
+			{
+			case silentCrushAndRaise:
+				break;
+			default:
+				S_StartSound((mobj_t*)&ceiling->sector->soundorg, sfx_stnmov);
+				// ?
+				break;
+			}
+		}
+
+		if (res == pastdest)
+		{
+			switch (ceiling->type)
+			{
+			case raiseToHighest:
+				P_RemoveActiveCeiling(ceiling);
+				break;
+
+			case silentCrushAndRaise:
+				S_StartSound((mobj_t*)&ceiling->sector->soundorg, sfx_pstop);
+			case fastCrushAndRaise:
+			case crushAndRaise:
+				ceiling->direction = -1;
+				break;
+
+			default:
+				break;
+			}
+		}
+		break;
+
+	case -1:
+		// DOWN
+		res = T_MovePlane(ceiling->sector, ceiling->speed, ceiling->bottomheight, ceiling->crush, 1,
+						  ceiling->direction);
+
+		if (!(leveltime & 7))
+		{
+			switch (ceiling->type)
+			{
+			case silentCrushAndRaise:
+				break;
+			default:
+				S_StartSound((mobj_t*)&ceiling->sector->soundorg, sfx_stnmov);
+			}
+		}
+
+		if (res == pastdest)
+		{
+			switch (ceiling->type)
+			{
+			case silentCrushAndRaise:
+				S_StartSound((mobj_t*)&ceiling->sector->soundorg, sfx_pstop);
+			case crushAndRaise:
+				ceiling->speed = CEILSPEED;
+			case fastCrushAndRaise:
+				ceiling->direction = 1;
+				break;
+
+			case lowerAndCrush:
+			case lowerToFloor:
+				P_RemoveActiveCeiling(ceiling);
+				break;
+
+			default:
+				break;
+			}
+		}
+		else // ( res != pastdest )
+		{
+			if (res == crushed)
 			{
 				switch (ceiling->type)
 				{
-					case silentCrushAndRaise:
-						break;
-					default:
-						S_StartSound(
-							(mobj_t*)&ceiling->sector->soundorg, sfx_stnmov
-						);
-						// ?
-						break;
+				case silentCrushAndRaise:
+				case crushAndRaise:
+				case lowerAndCrush:
+					ceiling->speed = CEILSPEED / 8;
+					break;
+
+				default:
+					break;
 				}
 			}
-
-			if (res == pastdest)
-			{
-				switch (ceiling->type)
-				{
-					case raiseToHighest:
-						P_RemoveActiveCeiling(ceiling);
-						break;
-
-					case silentCrushAndRaise:
-						S_StartSound(
-							(mobj_t*)&ceiling->sector->soundorg, sfx_pstop
-						);
-					case fastCrushAndRaise:
-					case crushAndRaise:
-						ceiling->direction = -1;
-						break;
-
-					default:
-						break;
-				}
-			}
-			break;
-
-		case -1:
-			// DOWN
-			res = T_MovePlane(
-				ceiling->sector, ceiling->speed, ceiling->bottomheight,
-				ceiling->crush, 1, ceiling->direction
-			);
-
-			if (!(leveltime & 7))
-			{
-				switch (ceiling->type)
-				{
-					case silentCrushAndRaise:
-						break;
-					default:
-						S_StartSound(
-							(mobj_t*)&ceiling->sector->soundorg, sfx_stnmov
-						);
-				}
-			}
-
-			if (res == pastdest)
-			{
-				switch (ceiling->type)
-				{
-					case silentCrushAndRaise:
-						S_StartSound(
-							(mobj_t*)&ceiling->sector->soundorg, sfx_pstop
-						);
-					case crushAndRaise:
-						ceiling->speed = CEILSPEED;
-					case fastCrushAndRaise:
-						ceiling->direction = 1;
-						break;
-
-					case lowerAndCrush:
-					case lowerToFloor:
-						P_RemoveActiveCeiling(ceiling);
-						break;
-
-					default:
-						break;
-				}
-			}
-			else // ( res != pastdest )
-			{
-				if (res == crushed)
-				{
-					switch (ceiling->type)
-					{
-						case silentCrushAndRaise:
-						case crushAndRaise:
-						case lowerAndCrush:
-							ceiling->speed = CEILSPEED / 8;
-							break;
-
-						default:
-							break;
-					}
-				}
-			}
-			break;
+		}
+		break;
 	}
 }
 
@@ -181,12 +168,12 @@ int EV_DoCeiling(line_t* line, ceiling_e type)
 	//	Reactivate in-stasis ceilings...for certain types.
 	switch (type)
 	{
-		case fastCrushAndRaise:
-		case silentCrushAndRaise:
-		case crushAndRaise:
-			P_ActivateInStasisCeiling(line);
-		default:
-			break;
+	case fastCrushAndRaise:
+	case silentCrushAndRaise:
+	case crushAndRaise:
+		P_ActivateInStasisCeiling(line);
+	default:
+		break;
 	}
 
 	while ((secnum = P_FindSectorFromLineTag(line, secnum)) >= 0)
@@ -206,32 +193,32 @@ int EV_DoCeiling(line_t* line, ceiling_e type)
 
 		switch (type)
 		{
-			case fastCrushAndRaise:
-				ceiling->crush = true;
-				ceiling->topheight = sec->ceilingheight;
-				ceiling->bottomheight = sec->floorheight + (8 * FRACUNIT);
-				ceiling->direction = -1;
-				ceiling->speed = CEILSPEED * 2;
-				break;
+		case fastCrushAndRaise:
+			ceiling->crush = true;
+			ceiling->topheight = sec->ceilingheight;
+			ceiling->bottomheight = sec->floorheight + (8 * FRACUNIT);
+			ceiling->direction = -1;
+			ceiling->speed = CEILSPEED * 2;
+			break;
 
-			case silentCrushAndRaise:
-			case crushAndRaise:
-				ceiling->crush = true;
-				ceiling->topheight = sec->ceilingheight;
-			case lowerAndCrush:
-			case lowerToFloor:
-				ceiling->bottomheight = sec->floorheight;
-				if (type != lowerToFloor)
-					ceiling->bottomheight += 8 * FRACUNIT;
-				ceiling->direction = -1;
-				ceiling->speed = CEILSPEED;
-				break;
+		case silentCrushAndRaise:
+		case crushAndRaise:
+			ceiling->crush = true;
+			ceiling->topheight = sec->ceilingheight;
+		case lowerAndCrush:
+		case lowerToFloor:
+			ceiling->bottomheight = sec->floorheight;
+			if (type != lowerToFloor)
+				ceiling->bottomheight += 8 * FRACUNIT;
+			ceiling->direction = -1;
+			ceiling->speed = CEILSPEED;
+			break;
 
-			case raiseToHighest:
-				ceiling->topheight = P_FindHighestCeilingSurrounding(sec);
-				ceiling->direction = 1;
-				ceiling->speed = CEILSPEED;
-				break;
+		case raiseToHighest:
+			ceiling->topheight = P_FindHighestCeilingSurrounding(sec);
+			ceiling->direction = 1;
+			ceiling->speed = CEILSPEED;
+			break;
 		}
 
 		ceiling->tag = sec->tag;
@@ -286,12 +273,11 @@ void P_ActivateInStasisCeiling(line_t* line)
 
 	for (i = 0; i < MAXCEILINGS; i++)
 	{
-		if (activeceilings[i] && (activeceilings[i]->tag == line->tag) &&
-			(activeceilings[i]->direction == 0))
+		if (activeceilings[i] && (activeceilings[i]->tag == line->tag)
+			&& (activeceilings[i]->direction == 0))
 		{
 			activeceilings[i]->direction = activeceilings[i]->olddirection;
-			activeceilings[i]->thinker.function.acp1 =
-				(actionf_p1)T_MoveCeiling;
+			activeceilings[i]->thinker.function.acp1 = (actionf_p1)T_MoveCeiling;
 		}
 	}
 }
@@ -308,8 +294,8 @@ int EV_CeilingCrushStop(line_t* line)
 	rtn = 0;
 	for (i = 0; i < MAXCEILINGS; i++)
 	{
-		if (activeceilings[i] && (activeceilings[i]->tag == line->tag) &&
-			(activeceilings[i]->direction != 0))
+		if (activeceilings[i] && (activeceilings[i]->tag == line->tag)
+			&& (activeceilings[i]->direction != 0))
 		{
 			activeceilings[i]->olddirection = activeceilings[i]->direction;
 			activeceilings[i]->thinker.function.acv = (actionf_v)NULL;

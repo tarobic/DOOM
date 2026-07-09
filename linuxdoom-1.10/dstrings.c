@@ -51,8 +51,7 @@ char* endmsg[NUM_QUITMESSAGES + 1] = {
 	// FinalDOOM?
 	"fuck you, pussy!\nget the fuck out!",
 	"you quit and i'll jizz\nin your cystholes!",
-	"if you leave, i'll make\nthe lord drink my jizz.",
-	"hey, ron! can we say\n'fuck' in the game?",
+	"if you leave, i'll make\nthe lord drink my jizz.", "hey, ron! can we say\n'fuck' in the game?",
 	"i'd leave: this is just\nmore monsters and levels.\nwhat a load.",
 	"suck it down, asshole!\nyou're a fucking wimp!",
 	"don't quit now! we're \nstill spending your money!",

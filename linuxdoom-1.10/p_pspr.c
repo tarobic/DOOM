@@ -170,13 +170,12 @@ boolean P_CheckAmmo(player_t* player)
 	// Preferences are set here.
 	do
 	{
-		if (player->weaponowned[wp_plasma] && player->ammo[am_cell] &&
-			(gamemode != shareware))
+		if (player->weaponowned[wp_plasma] && player->ammo[am_cell] && (gamemode != shareware))
 		{
 			player->pendingweapon = wp_plasma;
 		}
-		else if (player->weaponowned[wp_supershotgun] &&
-				 player->ammo[am_shell] > 2 && (gamemode == commercial))
+		else if (player->weaponowned[wp_supershotgun] && player->ammo[am_shell] > 2
+				 && (gamemode == commercial))
 		{
 			player->pendingweapon = wp_supershotgun;
 		}
@@ -200,8 +199,8 @@ boolean P_CheckAmmo(player_t* player)
 		{
 			player->pendingweapon = wp_missile;
 		}
-		else if (player->weaponowned[wp_bfg] && player->ammo[am_cell] > 40 &&
-				 (gamemode != shareware))
+		else if (player->weaponowned[wp_bfg] && player->ammo[am_cell] > 40
+				 && (gamemode != shareware))
 		{
 			player->pendingweapon = wp_bfg;
 		}
@@ -257,8 +256,7 @@ void A_WeaponReady(player_t* player, pspdef_t* psp)
 	int angle;
 
 	// get out of attack state
-	if (player->mo->state == &states[S_PLAY_ATK1] ||
-		player->mo->state == &states[S_PLAY_ATK2])
+	if (player->mo->state == &states[S_PLAY_ATK1] || player->mo->state == &states[S_PLAY_ATK2])
 	{
 		P_SetMobjState(player->mo, S_PLAY);
 	}
@@ -283,8 +281,8 @@ void A_WeaponReady(player_t* player, pspdef_t* psp)
 	//  the missile launcher and bfg do not auto fire
 	if (player->cmd.buttons & BT_ATTACK)
 	{
-		if (!player->attackdown || (player->readyweapon != wp_missile &&
-									player->readyweapon != wp_bfg))
+		if (!player->attackdown
+			|| (player->readyweapon != wp_missile && player->readyweapon != wp_bfg))
 		{
 			player->attackdown = true;
 			P_FireWeapon(player);
@@ -310,8 +308,7 @@ void A_ReFire(player_t* player, pspdef_t* psp)
 {
 	// check for fire
 	//  (if a weaponchange is pending, let it go through instead)
-	if ((player->cmd.buttons & BT_ATTACK) &&
-		player->pendingweapon == wp_nochange && player->health)
+	if ((player->cmd.buttons & BT_ATTACK) && player->pendingweapon == wp_nochange && player->health)
 	{
 		player->refire++;
 		P_FireWeapon(player);
@@ -425,9 +422,8 @@ void A_Punch(player_t* player, pspdef_t* psp)
 	if (linetarget)
 	{
 		S_StartSound(player->mo, sfx_punch);
-		player->mo->angle = R_PointToAngle2(
-			player->mo->x, player->mo->y, linetarget->x, linetarget->y
-		);
+		player->mo->angle
+			= R_PointToAngle2(player->mo->x, player->mo->y, linetarget->x, linetarget->y);
 	}
 }
 
@@ -456,9 +452,7 @@ void A_Saw(player_t* player, pspdef_t* psp)
 	S_StartSound(player->mo, sfx_sawhit);
 
 	// turn to face target
-	angle = R_PointToAngle2(
-		player->mo->x, player->mo->y, linetarget->x, linetarget->y
-	);
+	angle = R_PointToAngle2(player->mo->x, player->mo->y, linetarget->x, linetarget->y);
 	if (angle - player->mo->angle > ANG180)
 	{
 		if (angle - player->mo->angle < -ANG90 / 20)
@@ -501,10 +495,7 @@ void A_FirePlasma(player_t* player, pspdef_t* psp)
 {
 	player->ammo[weaponinfo[player->readyweapon].ammo]--;
 
-	P_SetPsprite(
-		player, ps_flash,
-		weaponinfo[player->readyweapon].flashstate + (P_Random() & 1)
-	);
+	P_SetPsprite(player, ps_flash, weaponinfo[player->readyweapon].flashstate + (P_Random() & 1));
 
 	P_SpawnPlayerMissile(player->mo, MT_PLASMA);
 }
@@ -612,10 +603,8 @@ void A_FireShotgun2(player_t* player, pspdef_t* psp)
 		damage = 5 * (P_Random() % 3 + 1);
 		angle = player->mo->angle;
 		angle += (P_Random() - P_Random()) << 19;
-		P_LineAttack(
-			player->mo, angle, MISSILERANGE,
-			bulletslope + ((P_Random() - P_Random()) << 5), damage
-		);
+		P_LineAttack(player->mo, angle, MISSILERANGE,
+					 bulletslope + ((P_Random() - P_Random()) << 5), damage);
 	}
 }
 
@@ -632,11 +621,8 @@ void A_FireCGun(player_t* player, pspdef_t* psp)
 	P_SetMobjState(player->mo, S_PLAY_ATK2);
 	player->ammo[weaponinfo[player->readyweapon].ammo]--;
 
-	P_SetPsprite(
-		player, ps_flash,
-		weaponinfo[player->readyweapon].flashstate + psp->state -
-			&states[S_CHAIN1]
-	);
+	P_SetPsprite(player, ps_flash,
+				 weaponinfo[player->readyweapon].flashstate + psp->state - &states[S_CHAIN1]);
 
 	P_BulletSlope(player->mo);
 
@@ -684,10 +670,8 @@ void A_BFGSpray(mobj_t* mo)
 		if (!linetarget)
 			continue;
 
-		P_SpawnMobj(
-			linetarget->x, linetarget->y,
-			linetarget->z + (linetarget->height >> 2), MT_EXTRABFG
-		);
+		P_SpawnMobj(linetarget->x, linetarget->y, linetarget->z + (linetarget->height >> 2),
+					MT_EXTRABFG);
 
 		damage = 0;
 		for (j = 0; j < 15; j++)
