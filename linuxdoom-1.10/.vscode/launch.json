@@ -1,0 +1,20 @@
+{
+	"$schema": "https://raw.githubusercontent.com/mfussenegger/dapconfig-schema/master/dapconfig-schema.json",
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "codelldb",
+			"request": "launch",
+			"name": "Run in xephyr",
+			"program": "linux/linuxxdoom",
+			"runInTerminal": true,
+			"console": "integratedTerminal",
+			"env": {
+				"DISPLAY": ":2"
+			},
+			"args": [
+				"-3"
+			]
+		}
+	]
+}
