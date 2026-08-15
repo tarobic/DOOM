@@ -6,9 +6,11 @@
 #
 CC = gcc  # gcc or g++
 
-CFLAGS = -std=gnu99 -g -w -DNORMALUNIX -DLINUX # -DUSEASM
+CFLAGS = -std=gnu99 -g -w -DNORMALUNIX -DLINUX -D_GNU_SOURCE # -DUSEASM
 LDFLAGS = -L/usr/X11R6/lib
-LIBS = -lXext -lX11 -lnsl -lm
+LIBS = -lXext -lX11 -lnsl -lm -lwayland-client -lxkbcommon
+
+WL_PROTOCOLS_BASE_PATH := $(shell pkg-config wayland-protocols --variable=pkgdatadir)
 
 # subdirectory for objects
 O = linux
@@ -83,12 +85,17 @@ clean:
 	rm -f *.o *~ *.flc
 	rm -f linux/*
 
-$(O)/linuxxdoom: $(OBJS) $(O)/i_main.o
+protocols:
+	$(shell mkdir -p ./wayland_protocols)
+	$(shell wayland-scanner client-header < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml > ./wayland_protocols/xdg-shell.h)
+	$(shell wayland-scanner private-code < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml > ./wayland_protocols/xdg-shell.c)
+
+$(O)/linuxxdoom: protocols $(OBJS) $(O)/i_main.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) $(O)/i_main.o \
 	-o $(O)/linuxxdoom $(LIBS)
 
 $(O)/%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -isystem ./wayland_protocols -c $< -o $@
 
 #############################################################
 #

@@ -1,0 +1,11 @@
+Xephyr :1 -ac -screen 320x200x8
+Then in another terminal:
+DISPLAY=:1
+./linux/linuxxdoom
+
+If you want a high resolution, pass -2, 3, or 4 for the "multiply" arg to linuxxdoom.
+Here are the corresponding resolutions for xephyr:
+
+-2 = 640x400x8
+-3 = 960x600x8
+-4 = 1280x800x8

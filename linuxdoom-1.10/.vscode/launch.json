@@ -10,11 +10,9 @@
 			"runInTerminal": true,
 			"console": "integratedTerminal",
 			"env": {
-				"DISPLAY": ":2"
+				"DISPLAY": ":1"
 			},
-			"args": [
-				"-3"
-			]
+			"args": []
 		}
 	]
 }

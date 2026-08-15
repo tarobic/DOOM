@@ -21,6 +21,7 @@
 //
 //-----------------------------------------------------------------------------
 
+#include <assert.h>
 static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
 #include <stdlib.h>
@@ -56,6 +57,16 @@ int XShmGetEventBase(Display* dpy); // problems with g++?
 
 #include "doomdef.h"
 
+#include <sys/mman.h>
+#include <time.h>
+#include <fcntl.h>
+#include <wayland-client.h>
+
+#include "xdg-shell.h"
+#include "xdg-shell.c"
+
+static struct wl_display* wl_display;
+
 #define POINTER_WARP_COUNTDOWN 1
 
 Display* X_display = 0;
@@ -87,6 +98,62 @@ int doPointerWarp = POINTER_WARP_COUNTDOWN;
 // According to Dave Taylor, it still is a bonehead thing
 // to use ....
 static int multiply = 1;
+
+static void randname(char* buf)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	long r = ts.tv_nsec;
+
+	for (int i = 0; i < 6; ++i)
+	{
+		buf[i] = 'A' + (r & 15) + (r & 16) * 2;
+		r >>= 5;
+	}
+}
+
+static int create_shm_file(void)
+{
+	int retries = 100;
+
+	do
+	{
+		char name[] = "/wl_shm-XXXXXX";
+		randname(name + sizeof(name) - 7);
+		--retries;
+
+		int fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, 0600);
+		if (fd >= 0)
+		{
+			shm_unlink(name);
+			return fd;
+		}
+	} while (retries > 0 && errno == EEXIST);
+
+	return -1;
+}
+
+int allocate_shm_file(size_t size)
+{
+	int fd = create_shm_file();
+	if (fd < 0)
+		return -1;
+
+	int ret;
+
+	do
+	{
+		ret = ftruncate(fd, size);
+	} while (ret < 0 && errno == EINTR);
+
+	if (ret < 0)
+	{
+		close(fd);
+		return -1;
+	}
+
+	return fd;
+}
 
 //
 //  Translates the key currently in X_event
@@ -223,6 +290,16 @@ void I_ShutdownGraphics(void)
 void I_StartFrame(void)
 {
 	// er?
+
+	int num_dispatched = 0;
+	do
+	{
+		if ((num_dispatched = wl_display_dispatch(wl_display)) == -1)
+		{
+			int err = wl_display_get_error(wl_display);
+			I_Error("Error while dispatching wayland events: %d\n", err);
+		}
+	} while (num_dispatched > 0);
 }
 
 static int lastmousex = 0;
@@ -673,6 +750,179 @@ void grabsharedmemory(int size)
 	fprintf(stderr, "shared memory id=%d, addr=0x%x\n", id, (int)(image->data));
 }
 
+typedef struct
+{
+	struct wl_display* wl_display;
+	struct wl_registry* wl_registry;
+	struct wl_compositor* wl_compositor;
+	struct xdg_wm_base* xdg_wm_base;
+	struct wl_shm* wl_shm;
+
+	struct wl_surface* wl_surface;
+	struct xdg_surface* xdg_surface;
+	struct xdg_toplevel* xdg_toplevel;
+
+	int width, height;
+	int offset;
+	bool closed;
+} WaylandState;
+
+static void wl_buffer_release(void* data, struct wl_buffer* wl_buffer)
+{
+	wl_buffer_destroy(wl_buffer);
+}
+
+static const struct wl_buffer_listener wl_buffer_listener = {
+	.release = wl_buffer_release,
+};
+
+struct wl_buffer* draw_frame(WaylandState* state)
+{
+	const int width = state->width, height = state->height;
+	int stride = width * 4;
+	int size = stride * height;
+
+	int fd = allocate_shm_file(size);
+	if (fd == -1)
+	{
+		return NULL;
+	}
+
+	unsigned int* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (data == MAP_FAILED)
+	{
+		close(fd);
+		return NULL;
+	}
+
+	struct wl_shm_pool* pool = wl_shm_create_pool(state->wl_shm, fd, size);
+	struct wl_buffer* buffer
+		= wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
+	wl_shm_pool_destroy(pool);
+	close(fd);
+
+	/* Draw checkerboxed background */
+	int offset = (int)state->offset % 8;
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			int is_dark_tile = ((x + offset) + (y + offset) / 8 * 8) % 16 < 8;
+			data[y * state->width + x] = is_dark_tile ? 0xFF666666 : 0xFFEEEEEE;
+		}
+	}
+
+	munmap(data, size);
+	wl_buffer_add_listener(buffer, &wl_buffer_listener, NULL);
+	return buffer;
+}
+
+static const struct wl_callback_listener wl_surface_frame_listener;
+
+static void wl_surface_frame_done(void* data, struct wl_callback* cb, unsigned int time)
+{
+	wl_callback_destroy(cb);
+
+	WaylandState* state = data;
+	cb = wl_surface_frame(state->wl_surface);
+	wl_callback_add_listener(cb, &wl_surface_frame_listener, state);
+
+	static int last_frame;
+	if (last_frame != 0)
+	{
+		int elapsed = time - last_frame;
+		state->offset += elapsed / 1000.0 * 24;
+	}
+
+	struct wl_buffer* buffer = draw_frame(state);
+	wl_surface_attach(state->wl_surface, buffer, 0, 0);
+	wl_surface_damage_buffer(state->wl_surface, 0, 0, INT32_MAX, INT32_MAX);
+	wl_surface_commit(state->wl_surface);
+
+	last_frame = time;
+}
+
+static const struct wl_callback_listener wl_surface_frame_listener = {
+	.done = wl_surface_frame_done,
+};
+
+static void xdg_surface_configure(void* data, struct xdg_surface* xdg_surface, unsigned int serial)
+{
+	WaylandState* state = data;
+	xdg_surface_ack_configure(xdg_surface, serial);
+
+	struct wl_buffer* buffer = draw_frame(state);
+	wl_surface_attach(state->wl_surface, buffer, 0, 0);
+	wl_surface_commit(state->wl_surface);
+}
+
+const struct xdg_surface_listener xdg_surface_listener = {
+	.configure = xdg_surface_configure,
+};
+
+static void xdg_wm_base_ping(void* data, struct xdg_wm_base* xdg_wm_base, unsigned int serial)
+{
+	xdg_wm_base_pong(xdg_wm_base, serial);
+}
+
+const struct xdg_wm_base_listener xdg_wm_base_listener = {
+	.ping = xdg_wm_base_ping,
+};
+
+static void xdg_toplevel_configure(void* data, struct xdg_toplevel* xdg_toplevel, int width,
+								   int height, struct wl_array* states)
+{
+	WaylandState* state = data;
+	if (width == 0 || height == 0)
+		return;
+
+	state->width = width;
+	state->height = height;
+}
+
+static void xdg_toplevel_close(void* data, struct xdg_toplevel* toplevel)
+{
+	WaylandState* state = data;
+	state->closed = true;
+}
+
+const struct xdg_toplevel_listener xdg_toplevel_listener = {
+	.configure = xdg_toplevel_configure,
+	.close = xdg_toplevel_close,
+};
+
+static void registry_global(void* data, struct wl_registry* wl_registry, unsigned int name,
+							const char* interface, unsigned int version)
+{
+	WaylandState* state = data;
+
+	if (strcmp(interface, wl_shm_interface.name) == 0)
+	{
+		state->wl_shm = wl_registry_bind(wl_registry, name, &wl_shm_interface, version);
+		assert(state->wl_shm);
+	}
+	else if (strcmp(interface, wl_compositor_interface.name) == 0)
+	{
+		state->wl_compositor
+			= wl_registry_bind(wl_registry, name, &wl_compositor_interface, version);
+	}
+	else if (strcmp(interface, xdg_wm_base_interface.name) == 0)
+	{
+		state->xdg_wm_base = wl_registry_bind(wl_registry, name, &xdg_wm_base_interface, 1);
+
+		xdg_wm_base_add_listener(state->xdg_wm_base, &xdg_wm_base_listener, state);
+	}
+}
+
+static void registry_global_remove(void* data, struct wl_registry* wl_registry, unsigned int name)
+{
+}
+
+static const struct wl_registry_listener wl_registry_listener = {
+	.global = registry_global,
+	.global_remove = registry_global_remove,
+};
+
 void I_InitGraphics(void)
 {
 	char* displayname;
@@ -739,6 +989,39 @@ void I_InitGraphics(void)
 			I_Error("bad -geom parameter");
 	}
 
+	{
+		wl_display = wl_display_connect(NULL);
+		if (wl_display == NULL)
+			I_Error("Could not open wl_display");
+
+		printf("connected to wl_display\n");
+
+		struct wl_registry* wl_registry = wl_display_get_registry(wl_display);
+
+		WaylandState state = {
+			.wl_display = wl_display,
+			.wl_registry = wl_registry,
+			.width = X_width,
+			.height = X_height,
+		};
+
+		wl_registry_add_listener(wl_registry, &wl_registry_listener, &state);
+		wl_display_roundtrip(wl_display);
+
+		state.wl_surface = wl_compositor_create_surface(state.wl_compositor);
+
+		state.xdg_surface = xdg_wm_base_get_xdg_surface(state.xdg_wm_base, state.wl_surface);
+		xdg_surface_add_listener(state.xdg_surface, &xdg_surface_listener, &state);
+
+		state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
+		xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state);
+
+		wl_surface_commit(state.wl_surface);
+
+		struct wl_callback* callback = wl_surface_frame(state.wl_surface);
+		wl_callback_add_listener(callback, &wl_surface_frame_listener, &state);
+	}
+
 	// open the display
 	X_display = XOpenDisplay(displayname);
 	if (!X_display)
@@ -757,6 +1040,8 @@ void I_InitGraphics(void)
 
 	// check for the MITSHM extension
 	doShm = XShmQueryExtension(X_display);
+
+	doShm = false;
 
 	// even if it's available, make sure it's a local connection
 	if (doShm)
