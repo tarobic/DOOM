@@ -21,6 +21,7 @@
 //
 //-----------------------------------------------------------------------------
 
+#include <assert.h>
 static const char rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 
 #include <stdarg.h>
@@ -661,13 +662,19 @@ void I_ShutdownSound(void)
 	return;
 }
 
+// fixme (Matt) segfault
 void I_InitSound()
 {
+	return;
 #ifdef SNDSERV
-	char buffer[256];
+	char buffer[4096];
 
-	if (getenv("DOOMWADDIR"))
-		sprintf(buffer, "%s/%s", getenv("DOOMWADDIR"), sndserver_filename);
+	char* waddir = getenv("DOOMWADDIR");
+	if (waddir != NULL)
+	{
+		printf("waddir: %s\n", waddir);
+		sprintf(buffer, "%s/%s", waddir, sndserver_filename);
+	}
 	else
 		sprintf(buffer, "%s", sndserver_filename);
 
@@ -693,7 +700,7 @@ void I_InitSound()
 
 	audio_fd = open("/dev/dsp", O_WRONLY);
 	if (audio_fd < 0)
-		fprintf(stderr, "Could not open /dev/dsp\n");
+		fprintf(stderr, "Could not open /dev/dsp: %s\n", strerror(errno));
 
 	i = 11 | (2 << 16);
 	myioctl(audio_fd, SNDCTL_DSP_SETFRAGMENT, &i);

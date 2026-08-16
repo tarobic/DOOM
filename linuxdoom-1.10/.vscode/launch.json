@@ -10,7 +10,8 @@
 			"runInTerminal": true,
 			"console": "integratedTerminal",
 			"env": {
-				"DISPLAY": ":1"
+				"DISPLAY": ":1",
+				"DOOMWADDIR": "${env:HOME}/src/id/doom/wads"
 			},
 			"args": []
 		}

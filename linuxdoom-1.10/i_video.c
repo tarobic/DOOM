@@ -21,24 +21,15 @@
 //
 //-----------------------------------------------------------------------------
 
-#include <assert.h>
 static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
+#define _GNU_SOURCE
+
+#include <assert.h>
 #include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <unistd.h>
-
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/keysym.h>
-
-#include <X11/extensions/XShm.h>
-// Had to dig up XShm.c for this one.
-// It is in the libXext, but not in the XFree86 headers.
-#ifdef LINUX
-int XShmGetEventBase(Display* dpy); // problems with g++?
-#endif
 
 #include <stdarg.h>
 #include <sys/socket.h>
@@ -48,6 +39,8 @@ int XShmGetEventBase(Display* dpy); // problems with g++?
 #include <errno.h>
 #include <netinet/in.h>
 #include <signal.h>
+
+#include <X11/Xlib.h>
 
 #include "d_main.h"
 #include "doomstat.h"
@@ -61,31 +54,89 @@ int XShmGetEventBase(Display* dpy); // problems with g++?
 #include <time.h>
 #include <fcntl.h>
 #include <wayland-client.h>
+#include <xkbcommon/xkbcommon.h>
+#include <linux/input-event-codes.h>
 
 #include "xdg-shell.h"
 #include "xdg-shell.c"
 
-static struct wl_display* wl_display;
+// #define MAX_BUFFERS 3
+
+typedef enum
+{
+	POINTER_EVENT_ENTER = 1 << 0,
+	POINTER_EVENT_LEAVE = 1 << 1,
+	POINTER_EVENT_MOTION = 1 << 2,
+	POINTER_EVENT_BUTTON = 1 << 3,
+	POINTER_EVENT_AXIS = 1 << 4,
+	POINTER_EVENT_AXIS_SOURCE = 1 << 5,
+	POINTER_EVENT_AXIS_STOP = 1 << 6,
+	POINTER_EVENT_AXIS_DISCRETE = 1 << 7,
+} PointerEventMask;
+
+typedef struct
+{
+	uint32_t event_mask;
+	wl_fixed_t surface_x, surface_y;
+	uint32_t button, state;
+	uint32_t time;
+	uint32_t serial;
+	struct
+	{
+		bool valid;
+		wl_fixed_t value;
+		int32_t discrete;
+	} axes[2];
+	uint32_t axis_source;
+} PointerEvent;
+
+typedef struct
+{
+	struct wl_buffer* wl_buffer;
+	void* data;
+	boolean busy;
+	int width, height, stride;
+} WaylandBuffer;
+
+static struct WaylandState
+{
+	struct wl_display* wl_display;
+	struct wl_registry* wl_registry;
+	struct wl_compositor* wl_compositor;
+	struct xdg_wm_base* xdg_wm_base;
+	struct wl_shm* wl_shm;
+
+	struct wl_surface* wl_surface;
+	struct xdg_surface* xdg_surface;
+	struct xdg_toplevel* xdg_toplevel;
+
+	struct wl_seat* wl_seat;
+	struct wl_keyboard* wl_keyboard;
+	struct xkb_state* xkb_state;
+	struct xkb_context* xkb_context;
+	struct xkb_keymap* xkb_keymap;
+	struct wl_pointer* wl_pointer;
+
+	PointerEvent pointer_event;
+
+	int width, height;
+	int offset;
+	boolean closed;
+	boolean fullscreen;
+	uint32_t configure_serial;
+	uint32_t format;
+	size_t bytes_per_pixel;
+
+	// WaylandBuffer buffers[MAX_BUFFERS];
+} state = {
+	.bytes_per_pixel = 4,
+	.format = WL_SHM_FORMAT_XRGB8888,
+};
 
 #define POINTER_WARP_COUNTDOWN 1
 
-Display* X_display = 0;
-Window X_mainWindow;
-Colormap X_cmap;
-Visual* X_visual;
-GC X_gc;
-XEvent X_event;
-int X_screen;
-XVisualInfo X_visualinfo;
-XImage* image;
 int X_width;
 int X_height;
-
-// MIT SHared Memory extension.
-boolean doShm;
-
-XShmSegmentInfo X_shminfo;
-int X_shmeventtype;
 
 // Fake mouse handling.
 // This cannot work properly w/o DGA.
@@ -98,6 +149,25 @@ int doPointerWarp = POINTER_WARP_COUNTDOWN;
 // According to Dave Taylor, it still is a bonehead thing
 // to use ....
 static int multiply = 1;
+
+// fixme
+static WaylandBuffer* image;
+
+static void handle_wayland_error(struct wl_display* display)
+{
+	int err = wl_display_get_error(display);
+
+	if (err == EPROTO)
+	{
+		uint32_t id;
+		const struct wl_interface* interface = NULL;
+		int code = wl_display_get_protocol_error(display, &interface, &id);
+		fprintf(stderr, "Protocol error from interface %p with id %d: %s\n", interface, id,
+				strerror(errno));
+	}
+
+	I_Error("Error while dispatching wayland events: %d\n", err);
+}
 
 static void randname(char* buf)
 {
@@ -133,7 +203,7 @@ static int create_shm_file(void)
 	return -1;
 }
 
-int allocate_shm_file(size_t size)
+static int allocate_shm_file(size_t size)
 {
 	int fd = create_shm_file();
 	if (fd < 0)
@@ -155,133 +225,716 @@ int allocate_shm_file(size_t size)
 	return fd;
 }
 
+static void wl_buffer_release(void* data, struct wl_buffer* wl_buffer)
+{
+	// WaylandBuffer* buffer = data;
+	// buffer->busy = false;
+	wl_buffer_destroy(wl_buffer);
+}
+
+static const struct wl_buffer_listener wl_buffer_listener = {
+	.release = wl_buffer_release,
+};
+
+// static void draw_checkerboard(WaylandState* state, int width, int height, uint32_t* data)
+// {
+// 	int offset = (int)state->offset % 8;
+// 	for (int y = 0; y < height; ++y)
+// 	{
+// 		for (int x = 0; x < width; ++x)
+// 		{
+// 			int is_dark_tile = ((x + offset) + (y + offset) / 8 * 8) % 16 < 8;
+// 			data[y * state->width + x] = is_dark_tile ? 0xFF666666 : 0xFFEEEEEE;
+// 		}
+// 	}
+// }
+
+static struct wl_buffer* create_buffer()
+{
+	const int32_t width = state.width, height = state.height;
+	const int32_t stride = width * state.bytes_per_pixel;
+	const int32_t size = stride * height;
+
+	int fd = allocate_shm_file(size);
+	if (fd == -1)
+	{
+		I_Error("creating a buffer file for %d B failed: %s\n", size, strerror(errno));
+	}
+
+	void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED_VALIDATE, fd, 0);
+	if (data == MAP_FAILED)
+	{
+		close(fd);
+		I_Error("mmap failed: %s\n", strerror(errno));
+	}
+
+	assert(state.wl_shm != NULL);
+	struct wl_shm_pool* pool = wl_shm_create_pool(state.wl_shm, fd, size);
+	assert(pool);
+
+	struct wl_buffer* buffer
+		= wl_shm_pool_create_buffer(pool, 0, width, height, stride, state.format);
+	assert(buffer);
+
+	assert(wl_buffer_add_listener(buffer, &wl_buffer_listener, NULL) != -1);
+
+	// fixme
+	byte* screen = screens[0];
+	byte* row = (byte*)data;
+	for (int y = 0; y < SCREENHEIGHT; y++)
+	{
+		uint32_t* pixel = (uint32_t*)row;
+		for (int x = 0; x < SCREENWIDTH; x++)
+		{
+			*pixel++ = screen[x + y * SCREENHEIGHT];
+		}
+
+		row += stride;
+	}
+
+	wl_shm_pool_destroy(pool);
+	assert(close(fd) != -1);
+	munmap(data, size);
+
+	return buffer;
+}
+
+static const struct wl_callback_listener wl_surface_frame_listener;
+
+static void redraw(void* data, struct wl_callback* callback, uint32_t time)
+{
+	if (callback != NULL)
+		wl_callback_destroy(callback);
+
+	/*
+	WaylandBuffer* buffer = NULL;
+
+	for (size_t i = 0; i < MAX_BUFFERS; i++)
+	{
+		if (state->buffers[i].busy == false)
+		{
+			buffer = &state->buffers[i];
+			break;
+		}
+	}
+
+	if (buffer == NULL)
+	{
+		fprintf(stderr, "All wayland buffers busy. Can't draw anything\n");
+		return;
+	}
+
+	buffer->busy = true;
+	*/
+
+	static int last_frame;
+	if (last_frame != 0)
+	{
+		int elapsed = time - last_frame;
+		state.offset += elapsed / 1000.0 * 24;
+	}
+
+	callback = wl_surface_frame(state.wl_surface);
+	assert(callback != NULL);
+	// assert(wl_callback_add_listener(callback, &wl_surface_frame_listener, buffer) != -1);
+
+	struct wl_buffer* wl_buffer = create_buffer();
+	assert(wl_callback_add_listener(callback, &wl_surface_frame_listener, wl_buffer) != -1);
+
+	// draw_checkerboard(state, state->width, state->height, buffer->data);
+
+	// image = buffer;
+
+	if (state.configure_serial != 0)
+	{
+		xdg_surface_ack_configure(state.xdg_surface, state.configure_serial);
+		state.configure_serial = 0;
+	}
+
+	// wl_surface_attach(state->wl_surface, buffer->wl_buffer, 0, 0);
+	wl_surface_attach(state.wl_surface, wl_buffer, 0, 0);
+	wl_surface_damage_buffer(state.wl_surface, 0, 0, INT32_MAX, INT32_MAX);
+	wl_surface_commit(state.wl_surface);
+
+	last_frame = time;
+}
+
+static const struct wl_callback_listener wl_surface_frame_listener = {
+	.done = redraw,
+};
+
+static void xdg_surface_configure(void* data, struct xdg_surface* xdg_surface, uint32_t serial)
+{
+	state.configure_serial = serial;
+}
+
+static const struct xdg_surface_listener xdg_surface_listener = {
+	.configure = xdg_surface_configure,
+};
+
+static void xdg_wm_base_ping(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial)
+{
+	xdg_wm_base_pong(xdg_wm_base, serial);
+}
+
+static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+	.ping = xdg_wm_base_ping,
+};
+
+static void xdg_toplevel_configure(void* data, struct xdg_toplevel* xdg_toplevel, int width,
+								   int height, struct wl_array* wl_states)
+{
+	if (width == 0 || height == 0)
+		return;
+
+	state.width = width;
+	state.height = height;
+}
+
+static void xdg_toplevel_close(void* data, struct xdg_toplevel* toplevel)
+{
+	state.closed = true;
+}
+
+static void xdg_toplevel_configure_bounds(void* data, struct xdg_toplevel* toplevel, int32_t width,
+										  int32_t height)
+{
+}
+
+static void xdg_toplevel_wm_capabilities(void* data, struct xdg_toplevel* toplevel,
+										 struct wl_array* capabilities)
+{
+}
+
+static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+	.configure = xdg_toplevel_configure,
+	.close = xdg_toplevel_close,
+	.configure_bounds = xdg_toplevel_configure_bounds,
+	.wm_capabilities = xdg_toplevel_wm_capabilities,
+};
+
+static void wl_shm_format(void* data, struct wl_shm* shm, uint32_t format)
+{
+	if (format == WL_SHM_FORMAT_RGB888)
+	{
+		// fprintf(stderr, "got shm fmt rgb888: %x\n", format);
+		// state.format = format;
+		// state.bytes_per_pixel = 1;
+	}
+}
+
+static int lastmousex = 0;
+static int lastmousey = 0;
+boolean mousemoved = false;
+
+static const struct wl_shm_listener wl_shm_listener = {
+	.format = wl_shm_format,
+};
+
+static void wl_pointer_enter(void* data, struct wl_pointer* wl_pointer, uint32_t serial,
+							 struct wl_surface* surface, wl_fixed_t surface_x, wl_fixed_t surface_y)
+{
+	state.pointer_event.event_mask |= POINTER_EVENT_ENTER;
+	state.pointer_event.serial = serial;
+	state.pointer_event.surface_x = surface_x;
+	state.pointer_event.surface_y = surface_y;
+}
+
+static void wl_pointer_leave(void* data, struct wl_pointer* wl_pointer, uint32_t serial,
+							 struct wl_surface* surface)
+{
+	state.pointer_event.serial = serial;
+	state.pointer_event.event_mask |= POINTER_EVENT_LEAVE;
+}
+
+static void wl_pointer_motion(void* data, struct wl_pointer* wl_pointer, uint32_t time,
+							  wl_fixed_t surface_x, wl_fixed_t surface_y)
+{
+	state.pointer_event.event_mask |= POINTER_EVENT_MOTION;
+	state.pointer_event.time = time;
+	state.pointer_event.surface_x = surface_x;
+	state.pointer_event.surface_y = surface_y;
+}
+
+static void wl_pointer_button(void* data, struct wl_pointer* wl_pointer, uint32_t serial,
+							  uint32_t time, uint32_t button, uint32_t button_state)
+{
+	state.pointer_event.event_mask |= POINTER_EVENT_BUTTON;
+	state.pointer_event.time = time;
+	state.pointer_event.serial = serial;
+	state.pointer_event.button = button;
+	state.pointer_event.state = button_state;
+}
+
+static void wl_pointer_axis(void* data, struct wl_pointer* wl_pointer, uint32_t time, uint32_t axis,
+							wl_fixed_t value)
+{
+	state.pointer_event.event_mask |= POINTER_EVENT_AXIS;
+	state.pointer_event.time = time;
+	state.pointer_event.axes[axis].valid = true;
+	state.pointer_event.axes[axis].value = value;
+}
+
+static void wl_pointer_axis_source(void* data, struct wl_pointer* wl_pointer, uint32_t axis_source)
+{
+	state.pointer_event.event_mask |= POINTER_EVENT_AXIS_SOURCE;
+	state.pointer_event.axis_source = axis_source;
+}
+
+static void wl_pointer_axis_stop(void* data, struct wl_pointer* wl_pointer, uint32_t time,
+								 uint32_t axis)
+{
+	state.pointer_event.time = time;
+	state.pointer_event.event_mask |= POINTER_EVENT_AXIS_STOP;
+	state.pointer_event.axes[axis].valid = true;
+}
+
+static void wl_pointer_axis_discrete(void* data, struct wl_pointer* wl_pointer, uint32_t axis,
+									 int32_t discrete)
+{
+	state.pointer_event.event_mask |= POINTER_EVENT_AXIS_DISCRETE;
+	state.pointer_event.axes[axis].valid = true;
+	state.pointer_event.axes[axis].discrete = discrete;
+}
+
+static void wl_pointer_frame(void* data, struct wl_pointer* wl_pointer)
+{
+	PointerEvent* event = &state.pointer_event;
+	fprintf(stderr, "pointer frame @ %d: ", event->time);
+
+	if (event->event_mask & POINTER_EVENT_ENTER)
+	{
+		fprintf(stderr, "entered %f, %f ", wl_fixed_to_double(event->surface_x),
+				wl_fixed_to_double(event->surface_y));
+	}
+
+	if (event->event_mask & POINTER_EVENT_LEAVE)
+	{
+		fprintf(stderr, "leave");
+	}
+
+	event_t e = {
+		.type = ev_mouse,
+	};
+
+	// todo: probably wanna do relative pointer wayland extension
+	if (event->event_mask & POINTER_EVENT_MOTION)
+	{
+		fprintf(stderr, "motion %f, %f ", wl_fixed_to_double(event->surface_x),
+				wl_fixed_to_double(event->surface_y));
+
+		// fixme: gotta translate all these to wl_pointer
+
+		// event.data1 = (X_event.xmotion.state & Button1Mask)
+		// 			| (X_event.xmotion.state & Button2Mask ? 2 : 0)
+		// 			| (X_event.xmotion.state & Button3Mask ? 4 : 0);
+		// event.data2 = (X_event.xmotion.x - lastmousex) << 2;
+		// event.data3 = (lastmousey - X_event.xmotion.y) << 2;
+		//
+		// if (event.data2 || event.data3)
+		// {
+		// 	lastmousex = X_event.xmotion.x;
+		// 	lastmousey = X_event.xmotion.y;
+		// 	if (X_event.xmotion.x != X_width / 2 && X_event.xmotion.y != X_height / 2)
+		// 	{
+		// 		D_PostEvent(&event);
+		// 		// fprintf(stderr, "m");
+		// 		mousemoved = false;
+		// 	}
+		// 	else
+		// 	{
+		// 		mousemoved = true;
+		// 	}
+		// }
+	}
+
+	if (event->event_mask & POINTER_EVENT_BUTTON)
+	{
+		char* button_state
+			= (event->state == WL_POINTER_BUTTON_STATE_RELEASED) ? "released" : "pressed";
+		fprintf(stderr, "button %d %s ", event->button, button_state);
+
+		// fixme: gotta translate all these to wl_pointer
+
+		if (event->state == WL_POINTER_BUTTON_STATE_PRESSED)
+		{
+			// event.data1 = (X_event.xbutton.state & Button1Mask)
+			// 			| (X_event.xbutton.state & Button2Mask ? 2 : 0)
+			// 			| (X_event.xbutton.state & Button3Mask ? 4 : 0)
+			// 			| (X_event.xbutton.button == Button1)
+			// 			| (X_event.xbutton.button == Button2 ? 2 : 0)
+			// 			| (X_event.xbutton.button == Button3 ? 4 : 0);
+		}
+		else
+		{
+			// e.data1 = (X_event.xbutton.state & Button1Mask)
+			// 		| (X_event.xbutton.state & Button2Mask ? 2 : 0)
+			// 		| (X_event.xbutton.state & Button3Mask ? 4 : 0);
+			//
+			// e.data1 = event.data1 ^ (X_event.xbutton.button == Button1 ? 1 : 0)
+			// 		^ (X_event.xbutton.button == Button2 ? 2 : 0)
+			// 		^ (X_event.xbutton.button == Button3 ? 4 : 0);
+		}
+
+		D_PostEvent(&e);
+	}
+
+	uint32_t axis_events = POINTER_EVENT_AXIS | POINTER_EVENT_AXIS_SOURCE | POINTER_EVENT_AXIS_STOP
+						 | POINTER_EVENT_AXIS_DISCRETE;
+
+	char* axis_name[2] = {
+		[WL_POINTER_AXIS_VERTICAL_SCROLL] = "vertical",
+		[WL_POINTER_AXIS_HORIZONTAL_SCROLL] = "horizontal",
+	};
+
+	char* axis_source[4] = {
+		[WL_POINTER_AXIS_SOURCE_WHEEL] = "wheel",
+		[WL_POINTER_AXIS_SOURCE_FINGER] = "finger",
+		[WL_POINTER_AXIS_SOURCE_CONTINUOUS] = "continuous",
+		[WL_POINTER_AXIS_SOURCE_WHEEL_TILT] = "wheel tilt",
+	};
+
+	if (event->event_mask & axis_events)
+	{
+		for (size_t i = 0; i < 2; ++i)
+		{
+			if (!event->axes[i].valid)
+			{
+				continue;
+			}
+			fprintf(stderr, "%s axis ", axis_name[i]);
+			if (event->event_mask & POINTER_EVENT_AXIS)
+			{
+				fprintf(stderr, "value %f ", wl_fixed_to_double(event->axes[i].value));
+			}
+			if (event->event_mask & POINTER_EVENT_AXIS_DISCRETE)
+			{
+				fprintf(stderr, "discrete %d ", event->axes[i].discrete);
+			}
+			if (event->event_mask & POINTER_EVENT_AXIS_SOURCE)
+			{
+				fprintf(stderr, "via %s ", axis_source[event->axis_source]);
+			}
+			if (event->event_mask & POINTER_EVENT_AXIS_STOP)
+			{
+				fprintf(stderr, "(stopped) ");
+			}
+		}
+	}
+
+	fprintf(stderr, "\n");
+	memset(event, 0, sizeof(*event));
+}
+
+static const struct wl_pointer_listener wl_pointer_listener = {
+	.enter = wl_pointer_enter,
+	.leave = wl_pointer_leave,
+	.motion = wl_pointer_motion,
+	.button = wl_pointer_button,
+	.axis = wl_pointer_axis,
+	.frame = wl_pointer_frame,
+	.axis_source = wl_pointer_axis_source,
+	.axis_stop = wl_pointer_axis_stop,
+	.axis_discrete = wl_pointer_axis_discrete,
+};
+
 //
 //  Translates the key currently in X_event
 //
 
-int xlatekey(void)
+static int xlatekey(xkb_keysym_t sym)
 {
-	int rc;
-
-	switch (rc = XKeycodeToKeysym(X_display, X_event.xkey.keycode, 0))
+	switch (sym)
 	{
-	case XK_Left:
-		rc = KEY_LEFTARROW;
+	case XKB_KEY_Left:
+		return KEY_LEFTARROW;
 		break;
-	case XK_Right:
-		rc = KEY_RIGHTARROW;
+	case XKB_KEY_Right:
+		return KEY_RIGHTARROW;
 		break;
-	case XK_Down:
-		rc = KEY_DOWNARROW;
+	case XKB_KEY_Down:
+		return KEY_DOWNARROW;
 		break;
-	case XK_Up:
-		rc = KEY_UPARROW;
+	case XKB_KEY_Up:
+		return KEY_UPARROW;
 		break;
-	case XK_Escape:
-		rc = KEY_ESCAPE;
+	case XKB_KEY_Escape:
+		return KEY_ESCAPE;
 		break;
-	case XK_Return:
-		rc = KEY_ENTER;
+	case XKB_KEY_Return:
+		return KEY_ENTER;
 		break;
-	case XK_Tab:
-		rc = KEY_TAB;
+	case XKB_KEY_Tab:
+		return KEY_TAB;
 		break;
-	case XK_F1:
-		rc = KEY_F1;
+	case XKB_KEY_F1:
+		return KEY_F1;
 		break;
-	case XK_F2:
-		rc = KEY_F2;
+	case XKB_KEY_F2:
+		return KEY_F2;
 		break;
-	case XK_F3:
-		rc = KEY_F3;
+	case XKB_KEY_F3:
+		return KEY_F3;
 		break;
-	case XK_F4:
-		rc = KEY_F4;
+	case XKB_KEY_F4:
+		return KEY_F4;
 		break;
-	case XK_F5:
-		rc = KEY_F5;
+	case XKB_KEY_F5:
+		return KEY_F5;
 		break;
-	case XK_F6:
-		rc = KEY_F6;
+	case XKB_KEY_F6:
+		return KEY_F6;
 		break;
-	case XK_F7:
-		rc = KEY_F7;
+	case XKB_KEY_F7:
+		return KEY_F7;
 		break;
-	case XK_F8:
-		rc = KEY_F8;
+	case XKB_KEY_F8:
+		return KEY_F8;
 		break;
-	case XK_F9:
-		rc = KEY_F9;
+	case XKB_KEY_F9:
+		return KEY_F9;
 		break;
-	case XK_F10:
-		rc = KEY_F10;
+	case XKB_KEY_F10:
+		return KEY_F10;
 		break;
-	case XK_F11:
-		rc = KEY_F11;
+	case XKB_KEY_F11:
+		return KEY_F11;
 		break;
-	case XK_F12:
-		rc = KEY_F12;
-		break;
-
-	case XK_BackSpace:
-	case XK_Delete:
-		rc = KEY_BACKSPACE;
+	case XKB_KEY_F12:
+		return KEY_F12;
 		break;
 
-	case XK_Pause:
-		rc = KEY_PAUSE;
+	case XKB_KEY_BackSpace:
+	case XKB_KEY_Delete:
+		return KEY_BACKSPACE;
 		break;
 
-	case XK_KP_Equal:
-	case XK_equal:
-		rc = KEY_EQUALS;
+	case XKB_KEY_Pause:
+		return KEY_PAUSE;
 		break;
 
-	case XK_KP_Subtract:
-	case XK_minus:
-		rc = KEY_MINUS;
+	case XKB_KEY_KP_Equal:
+	case XKB_KEY_equal:
+		return KEY_EQUALS;
 		break;
 
-	case XK_Shift_L:
-	case XK_Shift_R:
-		rc = KEY_RSHIFT;
+	case XKB_KEY_KP_Subtract:
+	case XKB_KEY_minus:
+		return KEY_MINUS;
 		break;
 
-	case XK_Control_L:
-	case XK_Control_R:
-		rc = KEY_RCTRL;
+	case XKB_KEY_Shift_L:
+	case XKB_KEY_Shift_R:
+		return KEY_RSHIFT;
 		break;
 
-	case XK_Alt_L:
-	case XK_Meta_L:
-	case XK_Alt_R:
-	case XK_Meta_R:
-		rc = KEY_RALT;
+	case XKB_KEY_Control_L:
+	case XKB_KEY_Control_R:
+		return KEY_RCTRL;
 		break;
 
-	default:
-		if (rc >= XK_space && rc <= XK_asciitilde)
-			rc = rc - XK_space + ' ';
-		if (rc >= 'A' && rc <= 'Z')
-			rc = rc - 'A' + 'a';
+	case XKB_KEY_Alt_L:
+	case XKB_KEY_Meta_L:
+	case XKB_KEY_Alt_R:
+	case XKB_KEY_Meta_R:
+		return KEY_RALT;
+		break;
+
+	default: // todo: check this
+		if (sym >= XKB_KEY_space && sym <= XKB_KEY_asciitilde)
+			return sym - XKB_KEY_space + ' ';
+		if (sym >= 'A' && sym <= 'Z')
+			return sym - 'A' + 'a';
 		break;
 	}
 
-	return rc;
+	return sym;
 }
+
+static void wl_keyboard_keymap(void* data, struct wl_keyboard* keyboard, uint32_t format,
+							   int32_t fd, uint32_t size)
+{
+	assert(format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1);
+
+	char* map_shm = mmap(NULL, size, PROT_READ, MAP_SHARED_VALIDATE, fd, 0);
+	if (map_shm == MAP_FAILED)
+		I_Error("mmap failed: %s\n", strerror(errno));
+
+	assert(state.xkb_context);
+	struct xkb_keymap* keymap = xkb_keymap_new_from_string(
+		state.xkb_context, map_shm, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+
+	munmap(map_shm, size);
+	close(fd);
+
+	struct xkb_state* xkb_state = xkb_state_new(keymap);
+	xkb_keymap_unref(state.xkb_keymap);
+	xkb_state_unref(state.xkb_state);
+	state.xkb_keymap = keymap;
+	state.xkb_state = xkb_state;
+}
+
+static void wl_keyboard_enter(void* data, struct wl_keyboard* keyboard, uint32_t serial,
+							  struct wl_surface* surface, struct wl_array* keys)
+{
+	uint32_t* key;
+
+	wl_array_for_each(key, keys)
+	{
+		char buf[128];
+
+		xkb_keysym_t sym = xkb_state_key_get_one_sym(state.xkb_state, *key + 8);
+		xkb_keysym_get_name(sym, buf, sizeof(buf));
+
+		xkb_state_key_get_utf8(state.xkb_state, *key + 8, buf, sizeof(buf));
+	}
+}
+
+static void wl_keyboard_key(void* data, struct wl_keyboard* wl_keyboard, uint32_t serial,
+							uint32_t time, uint32_t key, uint32_t key_state)
+{
+	char buf[128];
+
+	uint32_t keycode = key + 8;
+	xkb_keysym_t sym = xkb_state_key_get_one_sym(state.xkb_state, keycode);
+	xkb_keysym_get_name(sym, buf, sizeof(buf));
+
+	const char* action = (key_state == WL_KEYBOARD_KEY_STATE_PRESSED) ? "press" : "release";
+	fprintf(stderr, "key %s: sym: %-12s (%d), ", action, buf, sym);
+
+	xkb_state_key_get_utf8(state.xkb_state, keycode, buf, sizeof(buf));
+	fprintf(stderr, "utf8: '%s'\n", buf);
+
+	if (key_state == WL_KEYBOARD_KEY_STATE_REPEATED)
+		return;
+
+	event_t event = {
+		.type = (key_state == WL_KEYBOARD_KEY_STATE_PRESSED) ? ev_keydown : ev_keyup,
+		.data1 = xlatekey(sym),
+	};
+
+	D_PostEvent(&event);
+
+	if (key_state == WL_KEYBOARD_KEY_STATE_PRESSED && sym == XKB_KEY_f)
+	{
+		if (state.fullscreen == true)
+			xdg_toplevel_unset_fullscreen(state.xdg_toplevel);
+		else
+			xdg_toplevel_set_fullscreen(state.xdg_toplevel, NULL);
+
+		state.fullscreen = !state.fullscreen;
+	}
+}
+
+static void wl_keyboard_leave(void* data, struct wl_keyboard* wl_keyboard, uint32_t serial,
+							  struct wl_surface* surface)
+{
+}
+
+static void wl_keyboard_modifiers(void* data, struct wl_keyboard* wl_keyboard, uint32_t serial,
+								  uint32_t mods_depressed, uint32_t mods_latched,
+								  uint32_t mods_locked, uint32_t group)
+{
+	xkb_state_update_mask(state.xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+}
+
+static void wl_keyboard_repeat_info(void* data, struct wl_keyboard* wl_keyboard, int32_t rate,
+									int32_t delay)
+{
+}
+
+static struct wl_keyboard_listener wl_keyboard_listener = {
+	.keymap = wl_keyboard_keymap,
+	.enter = wl_keyboard_enter,
+	.leave = wl_keyboard_leave,
+	.key = wl_keyboard_key,
+	.modifiers = wl_keyboard_modifiers,
+	.repeat_info = wl_keyboard_repeat_info,
+};
+
+static void wl_seat_capabilities(void* data, struct wl_seat* wl_seat, uint32_t capabilities)
+{
+	boolean have_pointer = capabilities & WL_SEAT_CAPABILITY_POINTER;
+	if (have_pointer && state.wl_pointer == NULL)
+	{
+		printf("setting wl_pointer\n");
+		state.wl_pointer = wl_seat_get_pointer(state.wl_seat);
+		wl_pointer_add_listener(state.wl_pointer, &wl_pointer_listener, NULL);
+	}
+	else if (!have_pointer && state.wl_pointer != NULL)
+	{
+		printf("releasing wl_pointer\n");
+		wl_pointer_release(state.wl_pointer);
+		state.wl_pointer = NULL;
+	}
+
+	bool have_keyboard = capabilities & WL_SEAT_CAPABILITY_KEYBOARD;
+
+	if (have_keyboard && state.wl_keyboard == NULL)
+	{
+		state.wl_keyboard = wl_seat_get_keyboard(state.wl_seat);
+		wl_keyboard_add_listener(state.wl_keyboard, &wl_keyboard_listener, NULL);
+	}
+	else if (!have_keyboard && state.wl_keyboard != NULL)
+	{
+		wl_keyboard_release(state.wl_keyboard);
+		state.wl_keyboard = NULL;
+	}
+}
+
+static void wl_seat_name(void* data, struct wl_seat* wl_seat, const char* name)
+{
+	fprintf(stderr, "seat name: %s\n", name);
+}
+
+const struct wl_seat_listener wl_seat_listener = {
+	.capabilities = wl_seat_capabilities,
+	.name = wl_seat_name,
+};
+
+static void registry_global(void* data, struct wl_registry* wl_registry, uint32_t name,
+							const char* interface, uint32_t version)
+{
+	if (strcmp(interface, wl_shm_interface.name) == 0)
+	{
+		state.wl_shm = wl_registry_bind(wl_registry, name, &wl_shm_interface, 2);
+		assert(state.wl_shm);
+
+		assert(wl_shm_add_listener(state.wl_shm, &wl_shm_listener, NULL) != -1);
+	}
+	else if (strcmp(interface, wl_compositor_interface.name) == 0)
+	{
+		state.wl_compositor = wl_registry_bind(wl_registry, name, &wl_compositor_interface, 6);
+
+		assert(state.wl_compositor);
+	}
+	else if (strcmp(interface, xdg_wm_base_interface.name) == 0)
+	{
+		state.xdg_wm_base = wl_registry_bind(wl_registry, name, &xdg_wm_base_interface, 6);
+		assert(state.xdg_wm_base);
+
+		assert(xdg_wm_base_add_listener(state.xdg_wm_base, &xdg_wm_base_listener, NULL) != -1);
+	}
+	else if (strcmp(interface, wl_seat_interface.name) == 0)
+	{
+		state.wl_seat = wl_registry_bind(wl_registry, name, &wl_seat_interface, 10);
+
+		wl_seat_add_listener(state.wl_seat, &wl_seat_listener, NULL);
+	}
+}
+
+static void registry_global_remove(void* data, struct wl_registry* wl_registry, unsigned int name)
+{
+}
+
+static const struct wl_registry_listener wl_registry_listener = {
+	.global = registry_global,
+	.global_remove = registry_global_remove,
+};
 
 void I_ShutdownGraphics(void)
 {
-	// Detach from X server
-	if (!XShmDetach(X_display, &X_shminfo))
-		I_Error("XShmDetach() failed in I_ShutdownGraphics()");
-
-	// Release shared memory.
-	shmdt(X_shminfo.shmaddr);
-	shmctl(X_shminfo.shmid, IPC_RMID, 0);
-
-	// Paranoia.
-	image->data = NULL;
+	// todo
 }
 
 //
@@ -290,122 +943,6 @@ void I_ShutdownGraphics(void)
 void I_StartFrame(void)
 {
 	// er?
-
-	int num_dispatched = 0;
-	do
-	{
-		if ((num_dispatched = wl_display_dispatch(wl_display)) == -1)
-		{
-			int err = wl_display_get_error(wl_display);
-			I_Error("Error while dispatching wayland events: %d\n", err);
-		}
-	} while (num_dispatched > 0);
-}
-
-static int lastmousex = 0;
-static int lastmousey = 0;
-boolean mousemoved = false;
-boolean shmFinished;
-
-void I_GetEvent(void)
-{
-	event_t event;
-
-	// put event-grabbing stuff in here
-	XNextEvent(X_display, &X_event);
-	switch (X_event.type)
-	{
-	case KeyPress:
-		event.type = ev_keydown;
-		event.data1 = xlatekey();
-		D_PostEvent(&event);
-		// fprintf(stderr, "k");
-		break;
-	case KeyRelease:
-		event.type = ev_keyup;
-		event.data1 = xlatekey();
-		D_PostEvent(&event);
-		// fprintf(stderr, "ku");
-		break;
-	case ButtonPress:
-		event.type = ev_mouse;
-		event.data1
-			= (X_event.xbutton.state & Button1Mask) | (X_event.xbutton.state & Button2Mask ? 2 : 0)
-			| (X_event.xbutton.state & Button3Mask ? 4 : 0) | (X_event.xbutton.button == Button1)
-			| (X_event.xbutton.button == Button2 ? 2 : 0)
-			| (X_event.xbutton.button == Button3 ? 4 : 0);
-		event.data2 = event.data3 = 0;
-		D_PostEvent(&event);
-		// fprintf(stderr, "b");
-		break;
-	case ButtonRelease:
-		event.type = ev_mouse;
-		event.data1 = (X_event.xbutton.state & Button1Mask)
-					| (X_event.xbutton.state & Button2Mask ? 2 : 0)
-					| (X_event.xbutton.state & Button3Mask ? 4 : 0);
-		// suggest parentheses around arithmetic in operand of |
-		event.data1 = event.data1 ^ (X_event.xbutton.button == Button1 ? 1 : 0)
-					^ (X_event.xbutton.button == Button2 ? 2 : 0)
-					^ (X_event.xbutton.button == Button3 ? 4 : 0);
-		event.data2 = event.data3 = 0;
-		D_PostEvent(&event);
-		// fprintf(stderr, "bu");
-		break;
-	case MotionNotify:
-		event.type = ev_mouse;
-		event.data1 = (X_event.xmotion.state & Button1Mask)
-					| (X_event.xmotion.state & Button2Mask ? 2 : 0)
-					| (X_event.xmotion.state & Button3Mask ? 4 : 0);
-		event.data2 = (X_event.xmotion.x - lastmousex) << 2;
-		event.data3 = (lastmousey - X_event.xmotion.y) << 2;
-
-		if (event.data2 || event.data3)
-		{
-			lastmousex = X_event.xmotion.x;
-			lastmousey = X_event.xmotion.y;
-			if (X_event.xmotion.x != X_width / 2 && X_event.xmotion.y != X_height / 2)
-			{
-				D_PostEvent(&event);
-				// fprintf(stderr, "m");
-				mousemoved = false;
-			}
-			else
-			{
-				mousemoved = true;
-			}
-		}
-		break;
-
-	case Expose:
-	case ConfigureNotify:
-		break;
-
-	default:
-		if (doShm && X_event.type == X_shmeventtype)
-			shmFinished = true;
-		break;
-	}
-}
-
-Cursor createnullcursor(Display* display, Window root)
-{
-	Pixmap cursormask;
-	XGCValues xgc;
-	GC gc;
-	XColor dummycolour;
-	Cursor cursor;
-
-	cursormask = XCreatePixmap(display, root, 1, 1, 1 /*depth*/);
-	xgc.function = GXclear;
-	gc = XCreateGC(display, cursormask, GCFunction, &xgc);
-	XFillRectangle(display, cursormask, gc, 0, 0, 1, 1);
-	dummycolour.pixel = 0;
-	dummycolour.red = 0;
-	dummycolour.flags = 04;
-	cursor = XCreatePixmapCursor(display, cursormask, cursormask, &dummycolour, &dummycolour, 0, 0);
-	XFreePixmap(display, cursormask);
-	XFreeGC(display, gc);
-	return cursor;
 }
 
 //
@@ -413,26 +950,17 @@ Cursor createnullcursor(Display* display, Window root)
 //
 void I_StartTic(void)
 {
-	if (!X_display)
-		return;
-
-	while (XPending(X_display))
-		I_GetEvent();
-
-	// Warp the pointer back to the middle of the window
-	//  or it will wander off - that is, the game will
-	//  loose input focus within X11.
-	if (grabMouse)
+	int num_dispatched = 0;
+	do
 	{
-		if (!--doPointerWarp)
+		const struct timespec timeout = { .tv_sec = 0, .tv_nsec = 1e6 };
+		num_dispatched = wl_display_dispatch_timeout(state.wl_display, &timeout);
+
+		if (num_dispatched == -1)
 		{
-			XWarpPointer(X_display, None, X_mainWindow, 0, 0, 0, 0, X_width / 2, X_height / 2);
-
-			doPointerWarp = POINTER_WARP_COUNTDOWN;
+			handle_wayland_error(state.wl_display);
 		}
-	}
-
-	mousemoved = false;
+	} while (num_dispatched > 0);
 }
 
 //
@@ -473,7 +1001,7 @@ void I_FinishUpdate(void)
 	{
 		unsigned int* olineptrs[2];
 		unsigned int* ilineptr;
-		int x, y, i;
+		int x, y;
 		unsigned int twoopixels;
 		unsigned int twomoreopixels;
 		unsigned int fouripixels;
@@ -513,7 +1041,7 @@ void I_FinishUpdate(void)
 	{
 		unsigned int* olineptrs[3];
 		unsigned int* ilineptr;
-		int x, y, i;
+		int x, y;
 		unsigned int fouropixels[3];
 		unsigned int fouripixels;
 
@@ -567,28 +1095,6 @@ void I_FinishUpdate(void)
 		void Expand4(unsigned*, double*);
 		Expand4((unsigned*)(screens[0]), (double*)(image->data));
 	}
-
-	if (doShm)
-	{
-		if (!XShmPutImage(X_display, X_mainWindow, X_gc, image, 0, 0, 0, 0, X_width, X_height,
-						  True))
-			I_Error("XShmPutImage() failed\n");
-
-		// wait for it to finish and processes all input events
-		shmFinished = false;
-		do
-		{
-			I_GetEvent();
-		} while (!shmFinished);
-	}
-	else
-	{
-		// draw the image
-		XPutImage(X_display, X_mainWindow, X_gc, image, 0, 0, 0, 0, X_width, X_height);
-
-		// sync up with server
-		XSync(X_display, False);
-	}
 }
 
 //
@@ -606,6 +1112,8 @@ static XColor colors[256];
 
 void UploadNewPalette(Colormap cmap, byte* palette)
 {
+	return;
+	/* fixme
 	register int i;
 	register int c;
 	static boolean firstcall = true;
@@ -641,6 +1149,7 @@ void UploadNewPalette(Colormap cmap, byte* palette)
 		// store the colors to the current colormap
 		XStoreColors(X_display, cmap, colors, 256);
 	}
+	*/
 }
 
 //
@@ -648,280 +1157,8 @@ void UploadNewPalette(Colormap cmap, byte* palette)
 //
 void I_SetPalette(byte* palette)
 {
-	UploadNewPalette(X_cmap, palette);
+	// UploadNewPalette(X_cmap, palette);
 }
-
-//
-// This function is probably redundant,
-//  if XShmDetach works properly.
-// ddt never detached the XShm memory,
-//  thus there might have been stale
-//  handles accumulating.
-//
-void grabsharedmemory(int size)
-{
-	int key = ('d' << 24) | ('o' << 16) | ('o' << 8) | 'm';
-	struct shmid_ds shminfo;
-	int minsize = 320 * 200;
-	int id;
-	int rc;
-	// UNUSED int done=0;
-	int pollution = 5;
-
-	// try to use what was here before
-	do
-	{
-		id = shmget((key_t)key, minsize, 0777); // just get the id
-		if (id != -1)
-		{
-			rc = shmctl(id, IPC_STAT, &shminfo); // get stats on it
-			if (!rc)
-			{
-				if (shminfo.shm_nattch)
-				{
-					fprintf(stderr,
-							"User %d appears to be running "
-							"DOOM.  Is that wise?\n",
-							shminfo.shm_cpid);
-					key++;
-				}
-				else
-				{
-					if (getuid() == shminfo.shm_perm.cuid)
-					{
-						rc = shmctl(id, IPC_RMID, 0);
-						if (!rc)
-							fprintf(stderr, "Was able to kill my old shared memory\n");
-						else
-							I_Error("Was NOT able to kill my old shared memory");
-
-						id = shmget((key_t)key, size, IPC_CREAT | 0777);
-						if (id == -1)
-							I_Error("Could not get shared memory");
-
-						rc = shmctl(id, IPC_STAT, &shminfo);
-
-						break;
-					}
-					if (size >= shminfo.shm_segsz)
-					{
-						fprintf(stderr, "will use %d's stale shared memory\n", shminfo.shm_cpid);
-						break;
-					}
-					else
-					{
-						fprintf(stderr,
-								"warning: can't use stale "
-								"shared memory belonging to id %d, "
-								"key=0x%x\n",
-								shminfo.shm_cpid, key);
-						key++;
-					}
-				}
-			}
-			else
-			{
-				I_Error("could not get stats on key=%d", key);
-			}
-		}
-		else
-		{
-			id = shmget((key_t)key, size, IPC_CREAT | 0777);
-			if (id == -1)
-			{
-				fprintf(stderr, "errno=%d\n", errno);
-				I_Error("Could not get any shared memory");
-			}
-			break;
-		}
-	} while (--pollution);
-
-	if (!pollution)
-	{
-		I_Error("Sorry, system too polluted with stale "
-				"shared memory segments.\n");
-	}
-
-	X_shminfo.shmid = id;
-
-	// attach to the shared memory segment
-	image->data = X_shminfo.shmaddr = shmat(id, 0, 0);
-
-	fprintf(stderr, "shared memory id=%d, addr=0x%x\n", id, (int)(image->data));
-}
-
-typedef struct
-{
-	struct wl_display* wl_display;
-	struct wl_registry* wl_registry;
-	struct wl_compositor* wl_compositor;
-	struct xdg_wm_base* xdg_wm_base;
-	struct wl_shm* wl_shm;
-
-	struct wl_surface* wl_surface;
-	struct xdg_surface* xdg_surface;
-	struct xdg_toplevel* xdg_toplevel;
-
-	int width, height;
-	int offset;
-	bool closed;
-} WaylandState;
-
-static void wl_buffer_release(void* data, struct wl_buffer* wl_buffer)
-{
-	wl_buffer_destroy(wl_buffer);
-}
-
-static const struct wl_buffer_listener wl_buffer_listener = {
-	.release = wl_buffer_release,
-};
-
-struct wl_buffer* draw_frame(WaylandState* state)
-{
-	const int width = state->width, height = state->height;
-	int stride = width * 4;
-	int size = stride * height;
-
-	int fd = allocate_shm_file(size);
-	if (fd == -1)
-	{
-		return NULL;
-	}
-
-	unsigned int* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (data == MAP_FAILED)
-	{
-		close(fd);
-		return NULL;
-	}
-
-	struct wl_shm_pool* pool = wl_shm_create_pool(state->wl_shm, fd, size);
-	struct wl_buffer* buffer
-		= wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
-	wl_shm_pool_destroy(pool);
-	close(fd);
-
-	/* Draw checkerboxed background */
-	int offset = (int)state->offset % 8;
-	for (int y = 0; y < height; ++y)
-	{
-		for (int x = 0; x < width; ++x)
-		{
-			int is_dark_tile = ((x + offset) + (y + offset) / 8 * 8) % 16 < 8;
-			data[y * state->width + x] = is_dark_tile ? 0xFF666666 : 0xFFEEEEEE;
-		}
-	}
-
-	munmap(data, size);
-	wl_buffer_add_listener(buffer, &wl_buffer_listener, NULL);
-	return buffer;
-}
-
-static const struct wl_callback_listener wl_surface_frame_listener;
-
-static void wl_surface_frame_done(void* data, struct wl_callback* cb, unsigned int time)
-{
-	wl_callback_destroy(cb);
-
-	WaylandState* state = data;
-	cb = wl_surface_frame(state->wl_surface);
-	wl_callback_add_listener(cb, &wl_surface_frame_listener, state);
-
-	static int last_frame;
-	if (last_frame != 0)
-	{
-		int elapsed = time - last_frame;
-		state->offset += elapsed / 1000.0 * 24;
-	}
-
-	struct wl_buffer* buffer = draw_frame(state);
-	wl_surface_attach(state->wl_surface, buffer, 0, 0);
-	wl_surface_damage_buffer(state->wl_surface, 0, 0, INT32_MAX, INT32_MAX);
-	wl_surface_commit(state->wl_surface);
-
-	last_frame = time;
-}
-
-static const struct wl_callback_listener wl_surface_frame_listener = {
-	.done = wl_surface_frame_done,
-};
-
-static void xdg_surface_configure(void* data, struct xdg_surface* xdg_surface, unsigned int serial)
-{
-	WaylandState* state = data;
-	xdg_surface_ack_configure(xdg_surface, serial);
-
-	struct wl_buffer* buffer = draw_frame(state);
-	wl_surface_attach(state->wl_surface, buffer, 0, 0);
-	wl_surface_commit(state->wl_surface);
-}
-
-const struct xdg_surface_listener xdg_surface_listener = {
-	.configure = xdg_surface_configure,
-};
-
-static void xdg_wm_base_ping(void* data, struct xdg_wm_base* xdg_wm_base, unsigned int serial)
-{
-	xdg_wm_base_pong(xdg_wm_base, serial);
-}
-
-const struct xdg_wm_base_listener xdg_wm_base_listener = {
-	.ping = xdg_wm_base_ping,
-};
-
-static void xdg_toplevel_configure(void* data, struct xdg_toplevel* xdg_toplevel, int width,
-								   int height, struct wl_array* states)
-{
-	WaylandState* state = data;
-	if (width == 0 || height == 0)
-		return;
-
-	state->width = width;
-	state->height = height;
-}
-
-static void xdg_toplevel_close(void* data, struct xdg_toplevel* toplevel)
-{
-	WaylandState* state = data;
-	state->closed = true;
-}
-
-const struct xdg_toplevel_listener xdg_toplevel_listener = {
-	.configure = xdg_toplevel_configure,
-	.close = xdg_toplevel_close,
-};
-
-static void registry_global(void* data, struct wl_registry* wl_registry, unsigned int name,
-							const char* interface, unsigned int version)
-{
-	WaylandState* state = data;
-
-	if (strcmp(interface, wl_shm_interface.name) == 0)
-	{
-		state->wl_shm = wl_registry_bind(wl_registry, name, &wl_shm_interface, version);
-		assert(state->wl_shm);
-	}
-	else if (strcmp(interface, wl_compositor_interface.name) == 0)
-	{
-		state->wl_compositor
-			= wl_registry_bind(wl_registry, name, &wl_compositor_interface, version);
-	}
-	else if (strcmp(interface, xdg_wm_base_interface.name) == 0)
-	{
-		state->xdg_wm_base = wl_registry_bind(wl_registry, name, &xdg_wm_base_interface, 1);
-
-		xdg_wm_base_add_listener(state->xdg_wm_base, &xdg_wm_base_listener, state);
-	}
-}
-
-static void registry_global_remove(void* data, struct wl_registry* wl_registry, unsigned int name)
-{
-}
-
-static const struct wl_registry_listener wl_registry_listener = {
-	.global = registry_global,
-	.global_remove = registry_global_remove,
-};
 
 void I_InitGraphics(void)
 {
@@ -938,14 +1175,12 @@ void I_InitGraphics(void)
 
 	int oktodraw;
 	unsigned long attribmask;
-	XSetWindowAttributes attribs;
-	XGCValues xgcvalues;
 	int valuemask;
-	static int firsttime = 1;
+	static boolean firsttime = true;
 
 	if (!firsttime)
 		return;
-	firsttime = 0;
+	firsttime = false;
 
 	signal(SIGINT, (void (*)(int))I_Quit);
 
@@ -989,169 +1224,49 @@ void I_InitGraphics(void)
 			I_Error("bad -geom parameter");
 	}
 
-	{
-		wl_display = wl_display_connect(NULL);
-		if (wl_display == NULL)
-			I_Error("Could not open wl_display");
+	if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
+		fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
 
-		printf("connected to wl_display\n");
+	state.wl_display = wl_display_connect(NULL);
+	if (state.wl_display == NULL)
+		I_Error("Could not open wl_display");
 
-		struct wl_registry* wl_registry = wl_display_get_registry(wl_display);
+	fprintf(stderr, "connected to wl_display\n");
 
-		WaylandState state = {
-			.wl_display = wl_display,
-			.wl_registry = wl_registry,
-			.width = X_width,
-			.height = X_height,
-		};
+	state.wl_registry = wl_display_get_registry(state.wl_display), state.width = X_width,
+	state.height = X_height, state.xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS),
 
-		wl_registry_add_listener(wl_registry, &wl_registry_listener, &state);
-		wl_display_roundtrip(wl_display);
+	assert(state.wl_registry);
+	assert(state.xkb_context);
 
-		state.wl_surface = wl_compositor_create_surface(state.wl_compositor);
+	assert(wl_registry_add_listener(state.wl_registry, &wl_registry_listener, &state) != -1);
+	assert(wl_display_roundtrip(state.wl_display) != -1);
 
-		state.xdg_surface = xdg_wm_base_get_xdg_surface(state.xdg_wm_base, state.wl_surface);
-		xdg_surface_add_listener(state.xdg_surface, &xdg_surface_listener, &state);
+	state.wl_surface = wl_compositor_create_surface(state.wl_compositor);
+	assert(state.wl_surface);
 
-		state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
-		xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state);
+	state.xdg_surface = xdg_wm_base_get_xdg_surface(state.xdg_wm_base, state.wl_surface);
+	assert(state.xdg_surface);
+	assert(xdg_surface_add_listener(state.xdg_surface, &xdg_surface_listener, &state) != -1);
 
-		wl_surface_commit(state.wl_surface);
+	state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
+	assert(state.xdg_toplevel);
+	assert(xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state) != -1);
 
-		struct wl_callback* callback = wl_surface_frame(state.wl_surface);
-		wl_callback_add_listener(callback, &wl_surface_frame_listener, &state);
-	}
-
-	// open the display
-	X_display = XOpenDisplay(displayname);
-	if (!X_display)
-	{
-		if (displayname)
-			I_Error("Could not open display [%s]", displayname);
-		else
-			I_Error("Could not open display (DISPLAY=[%s])", getenv("DISPLAY"));
-	}
-
-	// use the default visual
-	X_screen = DefaultScreen(X_display);
-	if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo))
-		I_Error("xdoom currently only supports 256-color PseudoColor screens");
-	X_visual = X_visualinfo.visual;
-
-	// check for the MITSHM extension
-	doShm = XShmQueryExtension(X_display);
-
-	doShm = false;
-
-	// even if it's available, make sure it's a local connection
-	if (doShm)
-	{
-		if (!displayname)
-			displayname = (char*)getenv("DISPLAY");
-		if (displayname)
-		{
-			d = displayname;
-			while (*d && (*d != ':'))
-				d++;
-			if (*d)
-				*d = 0;
-			if (!(!strcasecmp(displayname, "unix") || !*displayname))
-				doShm = false;
-		}
-	}
-
-	fprintf(stderr, "Using MITSHM extension\n");
-
-	// create the colormap
-	X_cmap = XCreateColormap(X_display, RootWindow(X_display, X_screen), X_visual, AllocAll);
-
-	// setup attributes for main window
-	attribmask = CWEventMask | CWColormap | CWBorderPixel;
-	attribs.event_mask = KeyPressMask
-					   | KeyReleaseMask
-					   // | PointerMotionMask | ButtonPressMask | ButtonReleaseMask
-					   | ExposureMask;
-
-	attribs.colormap = X_cmap;
-	attribs.border_pixel = 0;
-
-	// create the main window
-	X_mainWindow
-		= XCreateWindow(X_display, RootWindow(X_display, X_screen), x, y, X_width, X_height,
-						0, // borderwidth
-						8, // depth
-						InputOutput, X_visual, attribmask, &attribs);
-
-	XInstallColormap(X_display, X_cmap);
-	XDefineCursor(X_display, X_mainWindow, createnullcursor(X_display, X_mainWindow));
-
-	// create the GC
-	valuemask = GCGraphicsExposures;
-	xgcvalues.graphics_exposures = False;
-	X_gc = XCreateGC(X_display, X_mainWindow, valuemask, &xgcvalues);
-
-	// map the window
-	XMapWindow(X_display, X_mainWindow);
-
-	// wait until it is OK to draw
-	oktodraw = 0;
-	while (!oktodraw)
-	{
-		XNextEvent(X_display, &X_event);
-		if (X_event.type == Expose && !X_event.xexpose.count)
-		{
-			oktodraw = 1;
-		}
-	}
+	wl_surface_commit(state.wl_surface);
+	assert(wl_display_roundtrip(state.wl_display) != -1);
+	// create_wayland_buffers(&state);
+	redraw(&state, NULL, 0);
 
 	// grabs the pointer so it is restricted to this window
 	if (grabMouse)
-		XGrabPointer(X_display, X_mainWindow, True,
-					 ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
-					 GrabModeAsync, X_mainWindow, None, CurrentTime);
-
-	if (doShm)
 	{
-		X_shmeventtype = XShmGetEventBase(X_display) + ShmCompletion;
-
-		// create the image
-		image = XShmCreateImage(X_display, X_visual, 8, ZPixmap, 0, &X_shminfo, X_width, X_height);
-
-		grabsharedmemory(image->bytes_per_line * image->height);
-
-		// UNUSED
-		// create the shared memory segment
-		// X_shminfo.shmid = shmget (IPC_PRIVATE,
-		// image->bytes_per_line * image->height, IPC_CREAT | 0777);
-		// if (X_shminfo.shmid < 0)
-		// {
-		// perror("");
-		// I_Error("shmget() failed in InitGraphics()");
-		// }
-		// fprintf(stderr, "shared memory id=%d\n", X_shminfo.shmid);
-		// attach to the shared memory segment
-		// image->data = X_shminfo.shmaddr = shmat(X_shminfo.shmid, 0, 0);
-
-		if (!image->data)
-		{
-			perror("");
-			I_Error("shmat() failed in InitGraphics()");
-		}
-
-		// get the X server to attach to it
-		if (!XShmAttach(X_display, &X_shminfo))
-			I_Error("XShmAttach() failed in InitGraphics()");
-	}
-	else
-	{
-		image = XCreateImage(X_display, X_visual, 8, ZPixmap, 0, (char*)malloc(X_width * X_height),
-							 X_width, X_height, 8, X_width);
+		// todo
 	}
 
-	if (multiply == 1)
-		screens[0] = (unsigned char*)(image->data);
-	else
-		screens[0] = (unsigned char*)malloc(SCREENWIDTH * SCREENHEIGHT);
+	// screens[0] = (multiply == 1) ? (byte*)(image->data) : (byte*)malloc(SCREENWIDTH *
+	// SCREENHEIGHT);
+	screens[0] = (byte*)malloc(SCREENWIDTH * SCREENHEIGHT);
 }
 
 unsigned exptable[256];

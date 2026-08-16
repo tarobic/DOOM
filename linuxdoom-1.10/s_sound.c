@@ -312,7 +312,7 @@ void S_StartSoundAtVolume(void* origin_p, int sfx_id, int volume)
 	if (sfx->lumpnum < 0)
 		sfx->lumpnum = I_GetSfxLumpNum(sfx);
 
-#ifndef SNDSRV
+#ifndef SNDSERV
 	// cache data if necessary
 	if (!sfx->data)
 	{

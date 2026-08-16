@@ -6,9 +6,10 @@
 #
 CC = gcc  # gcc or g++
 
-CFLAGS = -std=gnu99 -g -w -DNORMALUNIX -DLINUX -D_GNU_SOURCE # -DUSEASM
+CFLAGS = -std=gnu99 -g -O0 -DNORMALUNIX -DLINUX -Wshadow
 LDFLAGS = -L/usr/X11R6/lib
 LIBS = -lXext -lX11 -lnsl -lm -lwayland-client -lxkbcommon
+SANITIZE_FLAGS = -fsanitize=address -fno-ipa-icf -fno-omit-frame-pointer
 
 WL_PROTOCOLS_BASE_PATH := $(shell pkg-config wayland-protocols --variable=pkgdatadir)
 
@@ -77,10 +78,12 @@ OBJS = \
 		$(O)/s_sound.o \
 		$(O)/z_zone.o \
 		$(O)/info.o \
-		$(O)/sounds.o
+		$(O)/sounds.o \
 
+.PHONY: all
 all: $(O)/linuxxdoom
 
+.PHONY: clean
 clean:
 	rm -f *.o *~ *.flc
 	rm -f linux/*
@@ -96,6 +99,9 @@ $(O)/linuxxdoom: protocols $(OBJS) $(O)/i_main.o
 
 $(O)/%.o: %.c
 	$(CC) $(CFLAGS) -isystem ./wayland_protocols -c $< -o $@
+
+.PHONY: test
+test:
 
 #############################################################
 #
