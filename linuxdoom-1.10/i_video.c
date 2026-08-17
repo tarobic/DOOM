@@ -60,7 +60,9 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include "xdg-shell.h"
 #include "xdg-shell.c"
 
-// #define MAX_BUFFERS 3
+#define POINTER_WARP_COUNTDOWN 1
+#define MAX_BUFFERS 3
+static const int BYTES_PER_PIXEL = 4;
 
 typedef enum
 {
@@ -125,12 +127,8 @@ static struct WaylandState
 	boolean fullscreen;
 	uint32_t configure_serial;
 
-	// WaylandBuffer buffers[MAX_BUFFERS];
+	WaylandBuffer buffers[MAX_BUFFERS];
 } state = {};
-
-static const int BYTES_PER_PIXEL = 4;
-
-#define POINTER_WARP_COUNTDOWN 1
 
 int X_width;
 int X_height;
@@ -149,7 +147,7 @@ static int multiply = 1;
 
 static WaylandBuffer* image; // fixme
 
-static boolean frame_presented;
+static boolean frame_submitted;
 static unsigned int color_map[256];
 
 static void handle_wayland_error(struct wl_display* display)
@@ -269,9 +267,8 @@ static struct wl_buffer* create_buffer()
 		for (int x = 0; x < SCREENWIDTH; x++)
 		{
 			const int screen_pixel_index = x + y * SCREENWIDTH;
-			const byte palette_index = screens[0][screen_pixel_index];
+			const byte palette_index = ((byte*)image->data)[screen_pixel_index];
 			const unsigned int palette_color = color_map[palette_index];
-			// note: vga color depth is 18-bit.
 			data[screen_pixel_index] = palette_color;
 		}
 	}
@@ -285,6 +282,9 @@ static struct wl_buffer* create_buffer()
 
 static const struct wl_callback_listener wl_surface_frame_listener;
 
+// todo: should probably make a separate event queue for rendering to avoid unneccessary callbacks
+// to this during the event poll at the start of the tick.
+// We only want to commit a surface at the end of I_FinishUpdate.
 static void redraw(void* data, struct wl_callback* callback, uint32_t time)
 {
 	if (callback != NULL)
@@ -301,15 +301,20 @@ static void redraw(void* data, struct wl_callback* callback, uint32_t time)
 		state.configure_serial = 0;
 	}
 
-	if (frame_presented == false)
+	if (frame_submitted == false)
 	{
 		struct wl_buffer* wl_buffer = create_buffer();
 		wl_surface_attach(state.wl_surface, wl_buffer, 0, 0);
 		wl_surface_damage_buffer(state.wl_surface, 0, 0, INT32_MAX, INT32_MAX);
-		wl_surface_commit(state.wl_surface);
-
-		frame_presented = true;
+		frame_submitted = true;
+		printf("we did it\n");
 	}
+	else
+	{
+		printf("too soon\n");
+	}
+
+	wl_surface_commit(state.wl_surface);
 }
 
 static const struct wl_callback_listener wl_surface_frame_listener = {
@@ -878,10 +883,7 @@ static const struct wl_registry_listener wl_registry_listener = {
 	.global_remove = registry_global_remove,
 };
 
-void I_ShutdownGraphics(void)
-{
-	// todo
-}
+void I_ShutdownGraphics(void) {}
 
 //
 // I_StartFrame
@@ -900,7 +902,7 @@ void I_StartTic(void)
 	do
 	{
 		const struct timespec timeout = { .tv_sec = 0, .tv_nsec = 1e6 };
-		// num_dispatched = wl_display_dispatch_timeout(state.wl_display, &timeout);
+		num_dispatched = wl_display_dispatch_timeout(state.wl_display, &timeout);
 
 		if (num_dispatched == -1)
 		{
@@ -1042,12 +1044,14 @@ void I_FinishUpdate(void)
 		Expand4((unsigned*)(screens[0]), (double*)(image->data));
 	}
 
-	frame_presented = false;
+	memcpy(image->data, screens[0], SCREENWIDTH * SCREENHEIGHT);
+	frame_submitted = false;
+	printf("ok I'm ready\n");
 	do
 	{
 		if (wl_display_dispatch_timeout(state.wl_display, NULL) == -1)
 			handle_wayland_error(state.wl_display);
-	} while (frame_presented == false);
+	} while (frame_submitted == false);
 }
 
 //
@@ -1141,8 +1145,11 @@ void I_InitGraphics(void)
 			I_Error("bad -geom parameter");
 	}
 
-	// if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
-	// 	fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
+	if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
+		fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
+
+	image = malloc(sizeof *image);
+	image->data = calloc(SCREENWIDTH * SCREENHEIGHT, sizeof(byte));
 
 	state.wl_display = wl_display_connect(NULL);
 	if (state.wl_display == NULL)
@@ -1179,9 +1186,6 @@ void I_InitGraphics(void)
 	{
 		// todo
 	}
-
-	// screens[0] = (multiply == 1) ? (byte*)(image->data) : (byte*)malloc(SCREENWIDTH *
-	// SCREENHEIGHT);
 
 	// note: I think this gets allocated in V_Init actually?
 	// Was this an unneccessary allocation when multiply was greater than one?
