@@ -124,14 +124,11 @@ static struct WaylandState
 	boolean closed;
 	boolean fullscreen;
 	uint32_t configure_serial;
-	uint32_t format;
-	size_t bytes_per_pixel;
 
 	// WaylandBuffer buffers[MAX_BUFFERS];
-} state = {
-	.bytes_per_pixel = 4,
-	.format = WL_SHM_FORMAT_XRGB8888,
-};
+} state = {};
+
+static const int BYTES_PER_PIXEL = 4;
 
 #define POINTER_WARP_COUNTDOWN 1
 
@@ -150,8 +147,10 @@ int doPointerWarp = POINTER_WARP_COUNTDOWN;
 // to use ....
 static int multiply = 1;
 
-// fixme
-static WaylandBuffer* image;
+static WaylandBuffer* image; // fixme
+
+static boolean frame_presented;
+static unsigned int color_map[256];
 
 static void handle_wayland_error(struct wl_display* display)
 {
@@ -236,24 +235,11 @@ static const struct wl_buffer_listener wl_buffer_listener = {
 	.release = wl_buffer_release,
 };
 
-// static void draw_checkerboard(WaylandState* state, int width, int height, uint32_t* data)
-// {
-// 	int offset = (int)state->offset % 8;
-// 	for (int y = 0; y < height; ++y)
-// 	{
-// 		for (int x = 0; x < width; ++x)
-// 		{
-// 			int is_dark_tile = ((x + offset) + (y + offset) / 8 * 8) % 16 < 8;
-// 			data[y * state->width + x] = is_dark_tile ? 0xFF666666 : 0xFFEEEEEE;
-// 		}
-// 	}
-// }
-
 static struct wl_buffer* create_buffer()
 {
-	const int32_t width = state.width, height = state.height;
-	const int32_t stride = width * state.bytes_per_pixel;
-	const int32_t size = stride * height;
+	const int width = state.width, height = state.height;
+	const int stride = width * BYTES_PER_PIXEL;
+	const int size = stride * height;
 
 	int fd = allocate_shm_file(size);
 	if (fd == -1)
@@ -261,7 +247,7 @@ static struct wl_buffer* create_buffer()
 		I_Error("creating a buffer file for %d B failed: %s\n", size, strerror(errno));
 	}
 
-	void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED_VALIDATE, fd, 0);
+	unsigned int* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED_VALIDATE, fd, 0);
 	if (data == MAP_FAILED)
 	{
 		close(fd);
@@ -273,23 +259,21 @@ static struct wl_buffer* create_buffer()
 	assert(pool);
 
 	struct wl_buffer* buffer
-		= wl_shm_pool_create_buffer(pool, 0, width, height, stride, state.format);
+		= wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
 	assert(buffer);
 
 	assert(wl_buffer_add_listener(buffer, &wl_buffer_listener, NULL) != -1);
 
-	// fixme
-	byte* screen = screens[0];
-	byte* row = (byte*)data;
 	for (int y = 0; y < SCREENHEIGHT; y++)
 	{
-		uint32_t* pixel = (uint32_t*)row;
 		for (int x = 0; x < SCREENWIDTH; x++)
 		{
-			*pixel++ = screen[x + y * SCREENHEIGHT];
+			const int screen_pixel_index = x + y * SCREENWIDTH;
+			const byte palette_index = screens[0][screen_pixel_index];
+			const unsigned int palette_color = color_map[palette_index];
+			// note: vga color depth is 18-bit.
+			data[screen_pixel_index] = palette_color;
 		}
-
-		row += stride;
 	}
 
 	wl_shm_pool_destroy(pool);
@@ -306,44 +290,10 @@ static void redraw(void* data, struct wl_callback* callback, uint32_t time)
 	if (callback != NULL)
 		wl_callback_destroy(callback);
 
-	/*
-	WaylandBuffer* buffer = NULL;
-
-	for (size_t i = 0; i < MAX_BUFFERS; i++)
-	{
-		if (state->buffers[i].busy == false)
-		{
-			buffer = &state->buffers[i];
-			break;
-		}
-	}
-
-	if (buffer == NULL)
-	{
-		fprintf(stderr, "All wayland buffers busy. Can't draw anything\n");
-		return;
-	}
-
-	buffer->busy = true;
-	*/
-
-	static int last_frame;
-	if (last_frame != 0)
-	{
-		int elapsed = time - last_frame;
-		state.offset += elapsed / 1000.0 * 24;
-	}
-
 	callback = wl_surface_frame(state.wl_surface);
 	assert(callback != NULL);
-	// assert(wl_callback_add_listener(callback, &wl_surface_frame_listener, buffer) != -1);
 
-	struct wl_buffer* wl_buffer = create_buffer();
-	assert(wl_callback_add_listener(callback, &wl_surface_frame_listener, wl_buffer) != -1);
-
-	// draw_checkerboard(state, state->width, state->height, buffer->data);
-
-	// image = buffer;
+	assert(wl_callback_add_listener(callback, &wl_surface_frame_listener, NULL) != -1);
 
 	if (state.configure_serial != 0)
 	{
@@ -351,12 +301,15 @@ static void redraw(void* data, struct wl_callback* callback, uint32_t time)
 		state.configure_serial = 0;
 	}
 
-	// wl_surface_attach(state->wl_surface, buffer->wl_buffer, 0, 0);
-	wl_surface_attach(state.wl_surface, wl_buffer, 0, 0);
-	wl_surface_damage_buffer(state.wl_surface, 0, 0, INT32_MAX, INT32_MAX);
-	wl_surface_commit(state.wl_surface);
+	if (frame_presented == false)
+	{
+		struct wl_buffer* wl_buffer = create_buffer();
+		wl_surface_attach(state.wl_surface, wl_buffer, 0, 0);
+		wl_surface_damage_buffer(state.wl_surface, 0, 0, INT32_MAX, INT32_MAX);
+		wl_surface_commit(state.wl_surface);
 
-	last_frame = time;
+		frame_presented = true;
+	}
 }
 
 static const struct wl_callback_listener wl_surface_frame_listener = {
@@ -413,15 +366,7 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 	.wm_capabilities = xdg_toplevel_wm_capabilities,
 };
 
-static void wl_shm_format(void* data, struct wl_shm* shm, uint32_t format)
-{
-	if (format == WL_SHM_FORMAT_RGB888)
-	{
-		// fprintf(stderr, "got shm fmt rgb888: %x\n", format);
-		// state.format = format;
-		// state.bytes_per_pixel = 1;
-	}
-}
+static void wl_shm_format(void* data, struct wl_shm* shm, uint32_t format) {}
 
 static int lastmousex = 0;
 static int lastmousey = 0;
@@ -500,17 +445,17 @@ static void wl_pointer_axis_discrete(void* data, struct wl_pointer* wl_pointer, 
 static void wl_pointer_frame(void* data, struct wl_pointer* wl_pointer)
 {
 	PointerEvent* event = &state.pointer_event;
-	fprintf(stderr, "pointer frame @ %d: ", event->time);
+	// fprintf(stderr, "pointer frame @ %d: ", event->time);
 
 	if (event->event_mask & POINTER_EVENT_ENTER)
 	{
-		fprintf(stderr, "entered %f, %f ", wl_fixed_to_double(event->surface_x),
-				wl_fixed_to_double(event->surface_y));
+		// fprintf(stderr, "entered %f, %f ", wl_fixed_to_double(event->surface_x),
+		// 		wl_fixed_to_double(event->surface_y));
 	}
 
 	if (event->event_mask & POINTER_EVENT_LEAVE)
 	{
-		fprintf(stderr, "leave");
+		// fprintf(stderr, "leave");
 	}
 
 	event_t e = {
@@ -520,8 +465,8 @@ static void wl_pointer_frame(void* data, struct wl_pointer* wl_pointer)
 	// todo: probably wanna do relative pointer wayland extension
 	if (event->event_mask & POINTER_EVENT_MOTION)
 	{
-		fprintf(stderr, "motion %f, %f ", wl_fixed_to_double(event->surface_x),
-				wl_fixed_to_double(event->surface_y));
+		// fprintf(stderr, "motion %f, %f ", wl_fixed_to_double(event->surface_x),
+		// 		wl_fixed_to_double(event->surface_y));
 
 		// fixme: gotta translate all these to wl_pointer
 
@@ -552,7 +497,7 @@ static void wl_pointer_frame(void* data, struct wl_pointer* wl_pointer)
 	{
 		char* button_state
 			= (event->state == WL_POINTER_BUTTON_STATE_RELEASED) ? "released" : "pressed";
-		fprintf(stderr, "button %d %s ", event->button, button_state);
+		// fprintf(stderr, "button %d %s ", event->button, button_state);
 
 		// fixme: gotta translate all these to wl_pointer
 
@@ -602,27 +547,27 @@ static void wl_pointer_frame(void* data, struct wl_pointer* wl_pointer)
 			{
 				continue;
 			}
-			fprintf(stderr, "%s axis ", axis_name[i]);
+			// fprintf(stderr, "%s axis ", axis_name[i]);
 			if (event->event_mask & POINTER_EVENT_AXIS)
 			{
-				fprintf(stderr, "value %f ", wl_fixed_to_double(event->axes[i].value));
+				// fprintf(stderr, "value %f ", wl_fixed_to_double(event->axes[i].value));
 			}
 			if (event->event_mask & POINTER_EVENT_AXIS_DISCRETE)
 			{
-				fprintf(stderr, "discrete %d ", event->axes[i].discrete);
+				// fprintf(stderr, "discrete %d ", event->axes[i].discrete);
 			}
 			if (event->event_mask & POINTER_EVENT_AXIS_SOURCE)
 			{
-				fprintf(stderr, "via %s ", axis_source[event->axis_source]);
+				// fprintf(stderr, "via %s ", axis_source[event->axis_source]);
 			}
 			if (event->event_mask & POINTER_EVENT_AXIS_STOP)
 			{
-				fprintf(stderr, "(stopped) ");
+				// fprintf(stderr, "(stopped) ");
 			}
 		}
 	}
 
-	fprintf(stderr, "\n");
+	// fprintf(stderr, "\n");
 	memset(event, 0, sizeof(*event));
 }
 
@@ -800,10 +745,10 @@ static void wl_keyboard_key(void* data, struct wl_keyboard* wl_keyboard, uint32_
 	xkb_keysym_get_name(sym, buf, sizeof(buf));
 
 	const char* action = (key_state == WL_KEYBOARD_KEY_STATE_PRESSED) ? "press" : "release";
-	fprintf(stderr, "key %s: sym: %-12s (%d), ", action, buf, sym);
+	// fprintf(stderr, "key %s: sym: %-12s (%d), ", action, buf, sym);
 
 	xkb_state_key_get_utf8(state.xkb_state, keycode, buf, sizeof(buf));
-	fprintf(stderr, "utf8: '%s'\n", buf);
+	// fprintf(stderr, "utf8: '%s'\n", buf);
 
 	if (key_state == WL_KEYBOARD_KEY_STATE_REPEATED)
 		return;
@@ -892,6 +837,7 @@ const struct wl_seat_listener wl_seat_listener = {
 	.name = wl_seat_name,
 };
 
+// todo: check for minimum supported versions
 static void registry_global(void* data, struct wl_registry* wl_registry, uint32_t name,
 							const char* interface, uint32_t version)
 {
@@ -954,7 +900,7 @@ void I_StartTic(void)
 	do
 	{
 		const struct timespec timeout = { .tv_sec = 0, .tv_nsec = 1e6 };
-		num_dispatched = wl_display_dispatch_timeout(state.wl_display, &timeout);
+		// num_dispatched = wl_display_dispatch_timeout(state.wl_display, &timeout);
 
 		if (num_dispatched == -1)
 		{
@@ -1095,6 +1041,13 @@ void I_FinishUpdate(void)
 		void Expand4(unsigned*, double*);
 		Expand4((unsigned*)(screens[0]), (double*)(image->data));
 	}
+
+	frame_presented = false;
+	do
+	{
+		if (wl_display_dispatch_timeout(state.wl_display, NULL) == -1)
+			handle_wayland_error(state.wl_display);
+	} while (frame_presented == false);
 }
 
 //
@@ -1106,58 +1059,22 @@ void I_ReadScreen(byte* scr)
 }
 
 //
-// Palette stuff.
-//
-static XColor colors[256];
-
-void UploadNewPalette(Colormap cmap, byte* palette)
-{
-	return;
-	/* fixme
-	register int i;
-	register int c;
-	static boolean firstcall = true;
-
-#ifdef __cplusplus
-	if (X_visualinfo.c_class == PseudoColor && X_visualinfo.depth == 8)
-#else
-	if (X_visualinfo.class == PseudoColor && X_visualinfo.depth == 8)
-#endif
-	{
-		// initialize the colormap
-		if (firstcall)
-		{
-			firstcall = false;
-			for (i = 0; i < 256; i++)
-			{
-				colors[i].pixel = i;
-				colors[i].flags = DoRed | DoGreen | DoBlue;
-			}
-		}
-
-		// set the X colormap entries
-		for (i = 0; i < 256; i++)
-		{
-			c = gammatable[usegamma][*palette++];
-			colors[i].red = (c << 8) + c;
-			c = gammatable[usegamma][*palette++];
-			colors[i].green = (c << 8) + c;
-			c = gammatable[usegamma][*palette++];
-			colors[i].blue = (c << 8) + c;
-		}
-
-		// store the colors to the current colormap
-		XStoreColors(X_display, cmap, colors, 256);
-	}
-	*/
-}
-
-//
 // I_SetPalette
 //
 void I_SetPalette(byte* palette)
 {
-	// UploadNewPalette(X_cmap, palette);
+	int i;
+
+	// set the X colormap entries
+	for (i = 0; i < 256; i++)
+	{
+		byte r, b, g;
+		r = gammatable[usegamma][*palette++];
+		g = gammatable[usegamma][*palette++];
+		b = gammatable[usegamma][*palette++];
+
+		color_map[i] = (r << 16) | (g << 8) | b;
+	}
 }
 
 void I_InitGraphics(void)
@@ -1224,8 +1141,8 @@ void I_InitGraphics(void)
 			I_Error("bad -geom parameter");
 	}
 
-	if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
-		fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
+	// if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
+	// 	fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
 
 	state.wl_display = wl_display_connect(NULL);
 	if (state.wl_display == NULL)
@@ -1255,7 +1172,6 @@ void I_InitGraphics(void)
 
 	wl_surface_commit(state.wl_surface);
 	assert(wl_display_roundtrip(state.wl_display) != -1);
-	// create_wayland_buffers(&state);
 	redraw(&state, NULL, 0);
 
 	// grabs the pointer so it is restricted to this window
@@ -1266,7 +1182,11 @@ void I_InitGraphics(void)
 
 	// screens[0] = (multiply == 1) ? (byte*)(image->data) : (byte*)malloc(SCREENWIDTH *
 	// SCREENHEIGHT);
-	screens[0] = (byte*)malloc(SCREENWIDTH * SCREENHEIGHT);
+
+	// note: I think this gets allocated in V_Init actually?
+	// Was this an unneccessary allocation when multiply was greater than one?
+	// Otherwise it was set to the Xlib image data thing.
+	// screens[0] = (byte*)malloc(SCREENWIDTH * SCREENHEIGHT);
 }
 
 unsigned exptable[256];
