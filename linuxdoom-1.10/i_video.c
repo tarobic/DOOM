@@ -65,6 +65,26 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include "presentation-time.c"
 #include "viewporter.c"
 
+// TODO:
+// replace audio system with pipewire
+// mouse + extensions (relative, constraints, warp)
+// resolution/scaling
+// deal with clang warnings for og code
+// tighten up presentation timing
+// check for minimum supported versions of mandatory wayland protocols
+// switch to camelcase to be consistent with og code.
+// error handling
+// wayland extensions: (some can be optional)
+// - content type
+// - tearing control
+// - idle inhibit
+// - fractional scaling
+// - commit timing
+// - single pixel buffer (for background when fullscreen)
+// - input timestamps ? (seemingly only implemented by weston at time of writing)
+// - fifo
+// - dma-buf ? (is that relevant for software rendering or only opengl/vulkan?)
+
 // HACK: These are defined in linux/input-event-codes.h but a few of the keys defined in
 // doomdef.h conflict with those so we're not including it. wl_pointer_button needs these
 // so we just copy and pasted them here. We'll probably need to come up with a better solution if we
@@ -79,7 +99,6 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #define BTN_BACK 0x116
 #define BTN_TASK 0x117
 
-#define POINTER_WARP_COUNTDOWN 1
 #define MAX_BUFFERS 3
 static const int BYTES_PER_PIXEL = 4;
 static const long NSEC_PER_SEC = (long)1e9;
@@ -163,6 +182,8 @@ static struct WaylandState
 	.width = SCREENWIDTH,
 	.height = SCREENHEIGHT,
 };
+
+#define POINTER_WARP_COUNTDOWN 1
 
 int X_width;
 int X_height;
@@ -384,7 +405,6 @@ static void create_buffers()
 
 	wl_shm_pool_destroy(pool);
 	assert(close(fd) != -1);
-	// munmap(data, size);
 }
 
 static const struct wl_callback_listener wl_surface_frame_listener;
@@ -705,7 +725,7 @@ static void wl_pointer_frame(void* data, struct wl_pointer* wl_pointer)
 			= (event->state == WL_POINTER_BUTTON_STATE_RELEASED) ? "released" : "pressed";
 		// fprintf(stderr, "button %d %s ", event->button, button_state);
 
-		// fixme: gotta translate all these to wl_pointer
+		// fixme: gotta translate all this X_event stuff to wl_pointer
 
 		if (event->state == WL_POINTER_BUTTON_STATE_PRESSED)
 		{
@@ -1049,7 +1069,6 @@ const struct wl_seat_listener wl_seat_listener = {
 	.name = wl_seat_name,
 };
 
-// todo: check for minimum supported versions
 static void registry_global(void* data, struct wl_registry* wl_registry, uint32_t name,
 							const char* interface, uint32_t version)
 {
