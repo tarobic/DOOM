@@ -58,11 +58,15 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include <linux/input-event-codes.h>
 
 #include "xdg-shell.h"
+#include "presentation-time.h"
+
 #include "xdg-shell.c"
+#include "presentation-time.c"
 
 #define POINTER_WARP_COUNTDOWN 1
 #define MAX_BUFFERS 3
 static const int BYTES_PER_PIXEL = 4;
+static const long NSEC_PER_SEC = (long)1e9;
 
 typedef enum
 {
@@ -100,6 +104,13 @@ typedef struct
 	int width, height, stride;
 } WaylandBuffer;
 
+typedef struct
+{
+	uint32_t frame_number, frame_stamp;
+	struct wp_presentation_feedback* wp_presentation_feedback;
+	struct timespec commit, target, present;
+} PresentationFeedback;
+
 static struct WaylandState
 {
 	struct wl_display* wl_display;
@@ -107,11 +118,10 @@ static struct WaylandState
 	struct wl_compositor* wl_compositor;
 	struct xdg_wm_base* xdg_wm_base;
 	struct wl_shm* wl_shm;
-
 	struct wl_surface* wl_surface;
 	struct xdg_surface* xdg_surface;
 	struct xdg_toplevel* xdg_toplevel;
-
+	struct wp_presentation* wp_presentation;
 	struct wl_seat* wl_seat;
 	struct wl_keyboard* wl_keyboard;
 	struct xkb_state* xkb_state;
@@ -128,7 +138,10 @@ static struct WaylandState
 	uint32_t configure_serial;
 
 	WaylandBuffer buffers[MAX_BUFFERS];
-} state = {};
+} state = {
+	.width = SCREENWIDTH,
+	.height = SCREENHEIGHT,
+};
 
 int X_width;
 int X_height;
@@ -145,10 +158,16 @@ int doPointerWarp = POINTER_WARP_COUNTDOWN;
 // to use ....
 static int multiply = 1;
 
-static WaylandBuffer* image; // fixme
+// fixme: this used to be a Xlib data structure and it was for
+// upscaling when multiply is greater than one.
+// I repurposed it (partly to avoid breaking existing code) as a backbuffer to hold onto the
+// finished render data from screens[0] until a new frame is presented.
+static WaylandBuffer* image;
 
-static boolean frame_submitted;
+static boolean frame_committed, frame_presented;
 static unsigned int color_map[256];
+static uint32_t clock_id;
+static struct timespec start_time;
 
 static void handle_wayland_error(struct wl_display* display)
 {
@@ -222,22 +241,87 @@ static int allocate_shm_file(size_t size)
 	return fd;
 }
 
+static inline long timespec_to_nsec(const struct timespec* ts)
+{
+	return ts->tv_sec * NSEC_PER_SEC + ts->tv_nsec;
+}
+
+static inline long timespec_to_usec(const struct timespec* ts)
+{
+	return ts->tv_sec * (long)1e6 + ts->tv_nsec / 1000;
+}
+
+static inline long timespec_to_msec(const struct timespec* ts)
+{
+	return ts->tv_sec * 1000 + ts->tv_nsec / (long)1e6;
+}
+
+static inline void timespec_sub(struct timespec* r, const struct timespec* a,
+								const struct timespec* b)
+{
+	r->tv_sec = a->tv_sec - b->tv_sec;
+	r->tv_nsec = a->tv_nsec - b->tv_nsec;
+	if (r->tv_nsec < 0)
+	{
+		r->tv_sec--;
+		r->tv_nsec += NSEC_PER_SEC;
+	}
+}
+
+static inline long timespec_sub_to_nsec(const struct timespec* a, const struct timespec* b)
+{
+	struct timespec r;
+	timespec_sub(&r, a, b);
+	return timespec_to_nsec(&r);
+}
+
+static inline long timespec_sub_to_usec(const struct timespec* a, const struct timespec* b)
+{
+	return timespec_sub_to_nsec(a, b) / 1000;
+}
+
+static inline long timespec_sub_to_msec(const struct timespec* a, const struct timespec* b)
+{
+	return timespec_sub_to_nsec(a, b) / 1000000;
+}
+
+static long msec_since_start()
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return timespec_sub_to_msec(&ts, &start_time);
+}
+
 static void wl_buffer_release(void* data, struct wl_buffer* wl_buffer)
 {
-	// WaylandBuffer* buffer = data;
-	// buffer->busy = false;
-	wl_buffer_destroy(wl_buffer);
+	WaylandBuffer* buffer = data;
+	buffer->busy = false;
 }
 
 static const struct wl_buffer_listener wl_buffer_listener = {
 	.release = wl_buffer_release,
 };
 
-static struct wl_buffer* create_buffer()
+// Converts the colors in the data cached from screens[0]
+static void upload_image_data(unsigned int* dst)
+{
+	for (int y = 0; y < SCREENHEIGHT; y++)
+	{
+		for (int x = 0; x < SCREENWIDTH; x++)
+		{
+			const int screen_pixel_index = x + y * SCREENWIDTH;
+			const byte palette_index = ((byte*)image->data)[screen_pixel_index];
+			const unsigned int palette_color = color_map[palette_index];
+			dst[screen_pixel_index] = palette_color;
+		}
+	}
+}
+
+static void create_buffers()
 {
 	const int width = state.width, height = state.height;
 	const int stride = width * BYTES_PER_PIXEL;
-	const int size = stride * height;
+	const int size = stride * height * MAX_BUFFERS;
 
 	int fd = allocate_shm_file(size);
 	if (fd == -1)
@@ -256,44 +340,114 @@ static struct wl_buffer* create_buffer()
 	struct wl_shm_pool* pool = wl_shm_create_pool(state.wl_shm, fd, size);
 	assert(pool);
 
-	struct wl_buffer* buffer
-		= wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
-	assert(buffer);
-
-	assert(wl_buffer_add_listener(buffer, &wl_buffer_listener, NULL) != -1);
-
-	for (int y = 0; y < SCREENHEIGHT; y++)
+	for (int i = 0, offset = 0; i < MAX_BUFFERS; i++, offset += stride * height)
 	{
-		for (int x = 0; x < SCREENWIDTH; x++)
-		{
-			const int screen_pixel_index = x + y * SCREENWIDTH;
-			const byte palette_index = ((byte*)image->data)[screen_pixel_index];
-			const unsigned int palette_color = color_map[palette_index];
-			data[screen_pixel_index] = palette_color;
-		}
+		struct wl_buffer* buffer = wl_shm_pool_create_buffer(pool, offset, width, height, stride,
+															 WL_SHM_FORMAT_XRGB8888);
+
+		assert(buffer);
+
+		state.buffers[i] = (WaylandBuffer){
+			.data = (byte*)data + offset,
+			.width = width,
+			.height = height,
+			.stride = stride,
+			.busy = false,
+			.wl_buffer = buffer,
+		};
+
+		assert(wl_buffer_add_listener(buffer, &wl_buffer_listener, &state.buffers[i]) != -1);
 	}
 
 	wl_shm_pool_destroy(pool);
 	assert(close(fd) != -1);
-	munmap(data, size);
-
-	return buffer;
+	// munmap(data, size);
 }
 
 static const struct wl_callback_listener wl_surface_frame_listener;
 
-// todo: should probably make a separate event queue for rendering to avoid unneccessary callbacks
-// to this during the event poll at the start of the tick.
-// We only want to commit a surface at the end of I_FinishUpdate.
-static void redraw(void* data, struct wl_callback* callback, uint32_t time)
+static void create_next_frame();
+
+// note: 28 ms per tick
+static void feedback_presented(void* data, struct wp_presentation_feedback* presentation_feedback,
+							   uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec,
+							   uint32_t nsec_to_next_refresh, uint32_t seq_hi, uint32_t seq_lo,
+							   uint32_t flags)
 {
-	if (callback != NULL)
-		wl_callback_destroy(callback);
+	static struct timespec prev_present;
 
-	callback = wl_surface_frame(state.wl_surface);
-	assert(callback != NULL);
+	PresentationFeedback* feedback = data;
 
-	assert(wl_callback_add_listener(callback, &wl_surface_frame_listener, NULL) != -1);
+	frame_presented = true;
+	assert(feedback != NULL);
+
+	feedback->present = (struct timespec){
+		.tv_sec = ((uint64_t)tv_sec_hi << 32) + tv_sec_lo,
+		.tv_nsec = tv_nsec,
+	};
+
+#if DEBUG_PRESENTATION_TIMING
+	long start = timespec_to_usec(&start_time);
+	long present = timespec_to_usec(&feedback->present);
+	printf("frame presented  @ %4ld ms\n", (present - start) / 1000);
+
+	long commit = timespec_to_usec(&feedback->commit);
+	long c2p = present - commit;
+	long p2p = timespec_sub_to_usec(&feedback->present, &prev_present);
+	long t2p = timespec_sub_to_usec(&feedback->present, &feedback->target);
+	unsigned int seq = (unsigned int)((unsigned long)seq_hi << 32) + seq_lo;
+	printf("p2p:%3ld us, c2p:%3ld us, t2p:%3ld us, seq:%3u, est us to next refresh:%3d\n", p2p, c2p,
+		   t2p, seq, (int)(nsec_to_next_refresh / 1000));
+#endif
+
+	prev_present = feedback->present;
+
+	create_next_frame();
+}
+
+static void feedback_discarded(void* data, struct wp_presentation_feedback* presentation_feedback)
+{
+	printf("presentation feedback discarded\n");
+	create_next_frame();
+}
+
+static void feedback_sync_output(void* data, struct wp_presentation_feedback* presentation_feedback,
+								 struct wl_output* wl_output)
+{
+}
+
+static const struct wp_presentation_feedback_listener wp_presentation_feedback_listener = {
+	.sync_output = feedback_sync_output,
+	.presented = feedback_presented,
+	.discarded = feedback_discarded,
+};
+
+static void presentation_clock_id(void* data, struct wp_presentation* presentation, uint32_t id)
+{
+	clock_id = id;
+}
+
+static const struct wp_presentation_listener wp_presentation_listener = {
+	.clock_id = presentation_clock_id,
+};
+
+static void create_next_frame()
+{
+	static PresentationFeedback feedback;
+
+	// Setup the next presentation feedback.
+
+	if (feedback.wp_presentation_feedback != NULL)
+		wp_presentation_feedback_destroy(feedback.wp_presentation_feedback);
+
+	feedback.wp_presentation_feedback
+		= wp_presentation_feedback(state.wp_presentation, state.wl_surface);
+
+	wp_presentation_feedback_add_listener(feedback.wp_presentation_feedback,
+										  &wp_presentation_feedback_listener, &feedback);
+
+	clock_gettime(clock_id, &feedback.commit);
+	feedback.target = feedback.commit;
 
 	if (state.configure_serial != 0)
 	{
@@ -301,29 +455,53 @@ static void redraw(void* data, struct wl_callback* callback, uint32_t time)
 		state.configure_serial = 0;
 	}
 
-	if (frame_submitted == false)
+	if (frame_committed == false)
 	{
-		struct wl_buffer* wl_buffer = create_buffer();
-		wl_surface_attach(state.wl_surface, wl_buffer, 0, 0);
+		// Find next free buffer.
+		WaylandBuffer* next_buffer = NULL;
+
+		for (int i = 0; i < MAX_BUFFERS; i++)
+		{
+			if (state.buffers[i].busy == false)
+			{
+				next_buffer = &state.buffers[i];
+				break;
+			}
+		}
+
+		upload_image_data(next_buffer->data);
+
+		assert(next_buffer != NULL && "You need more buffers");
+		assert(next_buffer->wl_buffer != NULL);
+
+		wl_surface_attach(state.wl_surface, next_buffer->wl_buffer, 0, 0);
 		wl_surface_damage_buffer(state.wl_surface, 0, 0, INT32_MAX, INT32_MAX);
-		frame_submitted = true;
-		printf("we did it\n");
+		frame_committed = true;
+		frame_presented = false;
+		next_buffer->busy = true;
+#if DEBUG_PRESENTATION_TIMING
+		printf("frame committed  @ %4ld ms\n", msec_since_start());
+#endif
 	}
 	else
+#if DEBUG_PRESENTATION_TIMING
 	{
-		printf("too soon\n");
+		printf("too soon to commit @ %4ld ms\n", msec_since_start());
 	}
+#endif
 
 	wl_surface_commit(state.wl_surface);
 }
 
-static const struct wl_callback_listener wl_surface_frame_listener = {
-	.done = redraw,
-};
-
 static void xdg_surface_configure(void* data, struct xdg_surface* xdg_surface, uint32_t serial)
 {
+	static boolean initialized;
 	state.configure_serial = serial;
+	if (initialized == false)
+	{
+		initialized = true;
+		create_next_frame();
+	}
 }
 
 static const struct xdg_surface_listener xdg_surface_listener = {
@@ -872,6 +1050,17 @@ static void registry_global(void* data, struct wl_registry* wl_registry, uint32_
 
 		wl_seat_add_listener(state.wl_seat, &wl_seat_listener, NULL);
 	}
+	else if (strcmp(interface, wp_presentation_interface.name) == 0)
+	{
+		state.wp_presentation = wl_registry_bind(wl_registry, name, &wp_presentation_interface, 2);
+		assert(state.wp_presentation != NULL);
+
+		if (wp_presentation_add_listener(state.wp_presentation, &wp_presentation_listener, NULL)
+			== -1)
+		{
+			handle_wayland_error(state.wl_display);
+		}
+	}
 }
 
 static void registry_global_remove(void* data, struct wl_registry* wl_registry, unsigned int name)
@@ -890,7 +1079,21 @@ void I_ShutdownGraphics(void) {}
 //
 void I_StartFrame(void)
 {
-	// er?
+	printf("Started new tick @ %4ld ms\n", msec_since_start());
+}
+
+static int dispatch_events()
+{
+	int num_dispatched = 0;
+	const struct timespec timeout = { .tv_sec = 0, .tv_nsec = 1e6 };
+	num_dispatched = wl_display_dispatch_timeout(state.wl_display, &timeout);
+
+	if (num_dispatched == -1)
+	{
+		handle_wayland_error(state.wl_display);
+	}
+
+	return num_dispatched;
 }
 
 //
@@ -898,17 +1101,8 @@ void I_StartFrame(void)
 //
 void I_StartTic(void)
 {
-	int num_dispatched = 0;
-	do
-	{
-		const struct timespec timeout = { .tv_sec = 0, .tv_nsec = 1e6 };
-		num_dispatched = wl_display_dispatch_timeout(state.wl_display, &timeout);
-
-		if (num_dispatched == -1)
-		{
-			handle_wayland_error(state.wl_display);
-		}
-	} while (num_dispatched > 0);
+	while (dispatch_events() > 0)
+		;
 }
 
 //
@@ -1045,13 +1239,13 @@ void I_FinishUpdate(void)
 	}
 
 	memcpy(image->data, screens[0], SCREENWIDTH * SCREENHEIGHT);
-	frame_submitted = false;
-	printf("ok I'm ready\n");
-	do
-	{
-		if (wl_display_dispatch_timeout(state.wl_display, NULL) == -1)
-			handle_wayland_error(state.wl_display);
-	} while (frame_submitted == false);
+	frame_committed = false;
+#if DEBUG_PRESENTATION_TIMING
+	printf("next frame ready @ %4ld ms\n", msec_since_start());
+#endif
+
+	while (frame_committed == false)
+		dispatch_events();
 }
 
 //
@@ -1103,6 +1297,8 @@ void I_InitGraphics(void)
 		return;
 	firsttime = false;
 
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
+
 	signal(SIGINT, (void (*)(int))I_Quit);
 
 	if (M_CheckParm("-2"))
@@ -1148,9 +1344,6 @@ void I_InitGraphics(void)
 	if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
 		fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
 
-	image = malloc(sizeof *image);
-	image->data = calloc(SCREENWIDTH * SCREENHEIGHT, sizeof(byte));
-
 	state.wl_display = wl_display_connect(NULL);
 	if (state.wl_display == NULL)
 		I_Error("Could not open wl_display");
@@ -1177,9 +1370,14 @@ void I_InitGraphics(void)
 	assert(state.xdg_toplevel);
 	assert(xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state) != -1);
 
+	image = malloc(sizeof *image);
+	image->data = calloc(SCREENWIDTH * SCREENHEIGHT, sizeof(byte));
+	create_buffers();
 	wl_surface_commit(state.wl_surface);
 	assert(wl_display_roundtrip(state.wl_display) != -1);
-	redraw(&state, NULL, 0);
+	// redraw(&state, NULL, 0);
+
+	// create_next_frame();
 
 	// grabs the pointer so it is restricted to this window
 	if (grabMouse)

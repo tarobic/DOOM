@@ -6,7 +6,7 @@
 #
 CC = gcc  # gcc or g++
 
-CFLAGS = -std=gnu99 -g -O0 -DNORMALUNIX -DLINUX -Wshadow
+CFLAGS = -std=gnu99 -g -O0 -DNORMALUNIX -DLINUX -Wshadow -DDEBUG_PRESENTATION_TIMING
 LDFLAGS = -L/usr/X11R6/lib
 LIBS = -lXext -lX11 -lnsl -lm -lwayland-client -lxkbcommon
 SANITIZE_FLAGS = -fsanitize=address -fno-ipa-icf -fno-omit-frame-pointer
@@ -90,8 +90,16 @@ clean:
 
 protocols:
 	$(shell mkdir -p ./wayland_protocols)
-	$(shell wayland-scanner client-header < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml > ./wayland_protocols/xdg-shell.h)
-	$(shell wayland-scanner private-code < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml > ./wayland_protocols/xdg-shell.c)
+
+	$(shell wayland-scanner client-header < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml \
+		> ./wayland_protocols/xdg-shell.h)
+	$(shell wayland-scanner private-code < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml > \
+		./wayland_protocols/xdg-shell.c)
+
+	$(shell wayland-scanner client-header < $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml \
+		> ./wayland_protocols/presentation-time.h)
+	$(shell wayland-scanner private-code < $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml > \
+		./wayland_protocols/presentation-time.c)
 
 $(O)/linuxxdoom: protocols $(OBJS) $(O)/i_main.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) $(O)/i_main.o \
