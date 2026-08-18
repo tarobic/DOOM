@@ -55,7 +55,7 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include <fcntl.h>
 #include <wayland-client.h>
 #include <xkbcommon/xkbcommon.h>
-#include <linux/input-event-codes.h>
+// #include <linux/input-event-codes.h>
 
 #include "xdg-shell.h"
 #include "presentation-time.h"
@@ -64,6 +64,20 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include "xdg-shell.c"
 #include "presentation-time.c"
 #include "viewporter.c"
+
+// HACK: These are defined in linux/input-event-codes.h but a few of the keys defined in
+// doomdef.h conflict with those so we're not including it. wl_pointer_button needs these
+// so we just copy and pasted them here. We'll probably need to come up with a better solution if we
+// want to implement gamepad support from scratch since those codes are defined in
+// linux/input-event-codes.h too.
+#define BTN_LEFT 0x110
+#define BTN_RIGHT 0x111
+#define BTN_MIDDLE 0x112
+#define BTN_SIDE 0x113
+#define BTN_EXTRA 0x114
+#define BTN_FORWARD 0x115
+#define BTN_BACK 0x116
+#define BTN_TASK 0x117
 
 #define POINTER_WARP_COUNTDOWN 1
 #define MAX_BUFFERS 3
@@ -779,7 +793,6 @@ static const struct wl_pointer_listener wl_pointer_listener = {
 //  Translates the key currently in X_event
 //
 
-// fixme: enter key doesn't work in main menu.
 static int xlatekey(xkb_keysym_t sym)
 {
 	switch (sym)
