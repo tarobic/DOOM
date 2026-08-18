@@ -88,18 +88,30 @@ clean:
 	rm -f *.o *~ *.flc
 	rm -f linux/*
 
+.PHONY: protocols
 protocols:
 	$(shell mkdir -p ./wayland_protocols)
 
-	$(shell wayland-scanner client-header < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml \
+	$(shell wayland-scanner client-header \
+		< $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml \
 		> ./wayland_protocols/xdg-shell.h)
-	$(shell wayland-scanner private-code < $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml > \
-		./wayland_protocols/xdg-shell.c)
+	$(shell wayland-scanner private-code \
+		< $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml \
+		> ./wayland_protocols/xdg-shell.c)
 
-	$(shell wayland-scanner client-header < $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml \
+	$(shell wayland-scanner client-header \
+		< $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml \
 		> ./wayland_protocols/presentation-time.h)
-	$(shell wayland-scanner private-code < $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml > \
-		./wayland_protocols/presentation-time.c)
+	$(shell wayland-scanner private-code \
+		< $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml \
+		> ./wayland_protocols/presentation-time.c)
+
+	$(shell wayland-scanner client-header \
+		< $(WL_PROTOCOLS_BASE_PATH)/stable/viewporter/viewporter.xml \
+		> ./wayland_protocols/viewporter.h)
+	$(shell wayland-scanner private-code \
+		< $(WL_PROTOCOLS_BASE_PATH)/stable/viewporter/viewporter.xml \
+		> ./wayland_protocols/viewporter.c)
 
 $(O)/linuxxdoom: protocols $(OBJS) $(O)/i_main.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) $(O)/i_main.o \

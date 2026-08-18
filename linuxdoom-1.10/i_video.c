@@ -59,9 +59,11 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
 #include "xdg-shell.h"
 #include "presentation-time.h"
+#include "viewporter.h"
 
 #include "xdg-shell.c"
 #include "presentation-time.c"
+#include "viewporter.c"
 
 #define POINTER_WARP_COUNTDOWN 1
 #define MAX_BUFFERS 3
@@ -117,17 +119,22 @@ static struct WaylandState
 	struct wl_registry* wl_registry;
 	struct wl_compositor* wl_compositor;
 	struct xdg_wm_base* xdg_wm_base;
-	struct wl_shm* wl_shm;
-	struct wl_surface* wl_surface;
 	struct xdg_surface* xdg_surface;
 	struct xdg_toplevel* xdg_toplevel;
-	struct wp_presentation* wp_presentation;
+	struct wl_shm* wl_shm;
+	struct wl_surface* wl_surface;
+
 	struct wl_seat* wl_seat;
 	struct wl_keyboard* wl_keyboard;
 	struct xkb_state* xkb_state;
 	struct xkb_context* xkb_context;
 	struct xkb_keymap* xkb_keymap;
 	struct wl_pointer* wl_pointer;
+
+	struct wp_presentation* wp_presentation;
+
+	struct wp_viewport* wp_viewport;
+	struct wp_viewporter* wp_viewporter;
 
 	PointerEvent pointer_event;
 
@@ -770,6 +777,7 @@ static const struct wl_pointer_listener wl_pointer_listener = {
 //  Translates the key currently in X_event
 //
 
+// fixme: enter key doesn't work in main menu.
 static int xlatekey(xkb_keysym_t sym)
 {
 	switch (sym)
@@ -1060,6 +1068,11 @@ static void registry_global(void* data, struct wl_registry* wl_registry, uint32_
 		{
 			handle_wayland_error(state.wl_display);
 		}
+	}
+	else if (strcmp(interface, wp_viewporter_interface.name) == 0)
+	{
+		state.wp_viewporter = wl_registry_bind(wl_registry, name, &wp_viewporter_interface, 1);
+		assert(state.wp_viewporter != NULL);
 	}
 }
 
@@ -1370,14 +1383,14 @@ void I_InitGraphics(void)
 	assert(state.xdg_toplevel);
 	assert(xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state) != -1);
 
+	state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
+	wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH * 4, SCREENHEIGHT * 4);
+
 	image = malloc(sizeof *image);
 	image->data = calloc(SCREENWIDTH * SCREENHEIGHT, sizeof(byte));
 	create_buffers();
 	wl_surface_commit(state.wl_surface);
 	assert(wl_display_roundtrip(state.wl_display) != -1);
-	// redraw(&state, NULL, 0);
-
-	// create_next_frame();
 
 	// grabs the pointer so it is restricted to this window
 	if (grabMouse)
