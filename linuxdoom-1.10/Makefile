@@ -6,7 +6,7 @@
 #
 CC = gcc  # gcc or g++
 
-CFLAGS = -std=gnu99 -g -O0 -DNORMALUNIX -DLINUX -Wshadow -DDEBUG_PRESENTATION_TIMING
+CFLAGS = -std=gnu99 -g -O0 -DNORMALUNIX -DLINUX -Wshadow -DDEBUG_PRESENTATION_TIMING -DDEBUG
 LDFLAGS = -L/usr/X11R6/lib
 LIBS = -lXext -lX11 -lnsl -lm -lwayland-client -lxkbcommon
 SANITIZE_FLAGS = -fsanitize=address -fno-ipa-icf -fno-omit-frame-pointer

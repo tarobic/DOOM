@@ -234,8 +234,8 @@ typedef enum
 #define KEY_UPARROW 0xad
 #define KEY_DOWNARROW 0xaf
 #define KEY_ESCAPE 27
-#define KEY_ENTER 13
-#define KEY_TAB 9
+#define KEY_ENTER 13 // conflict
+#define KEY_TAB 9	 // conflict
 #define KEY_F1 (0x80 + 0x3b)
 #define KEY_F2 (0x80 + 0x3c)
 #define KEY_F3 (0x80 + 0x3d)
@@ -249,11 +249,11 @@ typedef enum
 #define KEY_F11 (0x80 + 0x57)
 #define KEY_F12 (0x80 + 0x58)
 
-#define KEY_BACKSPACE 127
-#define KEY_PAUSE 0xff
+#define KEY_BACKSPACE 127 // conflict
+#define KEY_PAUSE 0xff	  // conflict
 
 #define KEY_EQUALS 0x3d
-#define KEY_MINUS 0x2d
+#define KEY_MINUS 0x2d // conflict
 
 #define KEY_RSHIFT (0x80 + 0x36)
 #define KEY_RCTRL (0x80 + 0x1d)

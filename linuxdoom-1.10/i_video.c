@@ -165,10 +165,12 @@ int doPointerWarp = POINTER_WARP_COUNTDOWN;
 // to use ....
 static int multiply = 1;
 
-// fixme: this used to be a Xlib data structure and it was for
+// note: this used to be a Xlib data structure and it was for
 // upscaling when multiply is greater than one.
 // I repurposed it (partly to avoid breaking existing code) as a backbuffer to hold onto the
 // finished render data from screens[0] until a new frame is presented.
+// todo: get rid of this by using wl_list with each WaylandBuffer so that
+// this is the current buffer's next buffer.
 static WaylandBuffer* image;
 
 static boolean frame_committed, frame_presented;
@@ -491,11 +493,11 @@ static void create_next_frame()
 #endif
 	}
 	else
-#if DEBUG_PRESENTATION_TIMING
 	{
+#if DEBUG_PRESENTATION_TIMING
 		printf("too soon to commit @ %4ld ms\n", msec_since_start());
-	}
 #endif
+	}
 
 	wl_surface_commit(state.wl_surface);
 }
@@ -931,6 +933,7 @@ static void wl_keyboard_key(void* data, struct wl_keyboard* wl_keyboard, uint32_
 {
 	char buf[128];
 
+	// translate evdev scancode to xkb scancode.
 	uint32_t keycode = key + 8;
 	xkb_keysym_t sym = xkb_state_key_get_one_sym(state.xkb_state, keycode);
 	xkb_keysym_get_name(sym, buf, sizeof(buf));
@@ -951,6 +954,7 @@ static void wl_keyboard_key(void* data, struct wl_keyboard* wl_keyboard, uint32_
 
 	D_PostEvent(&event);
 
+#if DEBUG
 	if (key_state == WL_KEYBOARD_KEY_STATE_PRESSED && sym == XKB_KEY_f)
 	{
 		if (state.fullscreen == true)
@@ -960,11 +964,15 @@ static void wl_keyboard_key(void* data, struct wl_keyboard* wl_keyboard, uint32_
 
 		state.fullscreen = !state.fullscreen;
 	}
+#endif
 }
 
 static void wl_keyboard_leave(void* data, struct wl_keyboard* wl_keyboard, uint32_t serial,
 							  struct wl_surface* surface)
 {
+	xkb_state_unref(state.xkb_state);
+	xkb_keymap_unref(state.xkb_keymap);
+	xkb_context_unref(state.xkb_context);
 }
 
 static void wl_keyboard_modifiers(void* data, struct wl_keyboard* wl_keyboard, uint32_t serial,
@@ -1092,7 +1100,9 @@ void I_ShutdownGraphics(void) {}
 //
 void I_StartFrame(void)
 {
-	printf("Started new tick @ %4ld ms\n", msec_since_start());
+#if DEBUG_PRESENTATION_TIMING
+	printf("Started new frame @ %4ld ms\n", msec_since_start());
+#endif
 }
 
 static int dispatch_events()
@@ -1114,6 +1124,9 @@ static int dispatch_events()
 //
 void I_StartTic(void)
 {
+#if DEBUG_PRESENTATION_TIMING
+	printf("Started new tick @ %4ld ms\n", msec_since_start());
+#endif
 	while (dispatch_events() > 0)
 		;
 }
@@ -1382,6 +1395,8 @@ void I_InitGraphics(void)
 	state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
 	assert(state.xdg_toplevel);
 	assert(xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state) != -1);
+
+	xdg_toplevel_set_app_id(state.xdg_toplevel, "gamedev");
 
 	state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
 	wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH * 4, SCREENHEIGHT * 4);
