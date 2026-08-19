@@ -100,6 +100,8 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #define BTN_TASK 0x117
 
 #define MAX_BUFFERS 3
+#define SINGLE_BUFFER
+
 static const int BYTES_PER_PIXEL = 4;
 static const long NSEC_PER_SEC = (long)1e9;
 static const int MAX_SCALING_FACTOR = 3; // at least on kde it can be 0.5 to 3.
@@ -348,39 +350,49 @@ static long msec_since_start()
 
 static const struct wl_buffer_listener wl_buffer_listener;
 
+static void resize_buffer(WaylandBuffer* buffer)
+{
+	buffer->needs_resize = false;
+
+	if (buffer->wl_buffer != NULL)
+		wl_buffer_destroy(buffer->wl_buffer);
+
+	const int stride = state.framebuffer_width * BYTES_PER_PIXEL;
+	const int offset = buffer->index * stride * state.framebuffer_height;
+
+	struct wl_buffer* new_wl_buffer
+		= wl_shm_pool_create_buffer(state.pool, offset, state.framebuffer_width,
+									state.framebuffer_height, stride, WL_SHM_FORMAT_XRGB8888);
+
+	assert(new_wl_buffer);
+
+	state.buffers[buffer->index] = (WaylandBuffer){
+		.data = (byte*)state.buffer_data + offset,
+		.width = state.framebuffer_width,
+		.height = state.framebuffer_height,
+		.stride = stride,
+		.busy = false,
+		.wl_buffer = new_wl_buffer,
+		.index = buffer->index,
+	};
+
+	assert(wl_buffer_add_listener(new_wl_buffer, &wl_buffer_listener, buffer) != -1);
+}
+
 static void wl_buffer_release(void* data, struct wl_buffer* wl_buffer)
 {
+#ifdef SINGLE_BUFFER
+	wl_buffer_destroy(wl_buffer);
+#else
+
 	WaylandBuffer* buffer = data;
 	buffer->busy = false;
 
 	if (buffer->needs_resize == true)
 	{
-		buffer->needs_resize = false;
-
-		assert(wl_buffer == buffer->wl_buffer);
-		wl_buffer_destroy(buffer->wl_buffer);
-
-		const int stride = state.framebuffer_width * BYTES_PER_PIXEL;
-		const int offset = buffer->index * stride * state.framebuffer_height;
-
-		struct wl_buffer* new_wl_buffer
-			= wl_shm_pool_create_buffer(state.pool, offset, state.framebuffer_width,
-										state.framebuffer_height, stride, WL_SHM_FORMAT_XRGB8888);
-
-		assert(new_wl_buffer);
-
-		state.buffers[buffer->index] = (WaylandBuffer){
-			.data = (byte*)state.buffer_data + offset,
-			.width = state.framebuffer_width,
-			.height = state.framebuffer_height,
-			.stride = stride,
-			.busy = false,
-			.wl_buffer = new_wl_buffer,
-			.index = buffer->index,
-		};
-
-		assert(wl_buffer_add_listener(new_wl_buffer, &wl_buffer_listener, buffer) != -1);
+		resize_buffer(buffer);
 	}
+#endif
 }
 
 static const struct wl_buffer_listener wl_buffer_listener = {
@@ -401,6 +413,44 @@ static void upload_image_data(unsigned int* dst)
 			dst[screen_pixel_index] = palette_color;
 		}
 	}
+}
+
+struct wl_buffer* create_single_buffer()
+{
+	const int width = state.framebuffer_width, height = state.framebuffer_height;
+	const int stride = width * BYTES_PER_PIXEL;
+	const int size = stride * height * MAX_BUFFERS;
+
+	int fd = allocate_shm_file(size);
+	if (fd == -1)
+	{
+		I_Error("creating a buffer file for %d B failed: %s\n", size, strerror(errno));
+	}
+
+	unsigned int* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED_VALIDATE, fd, 0);
+	if (data == MAP_FAILED)
+	{
+		close(fd);
+		I_Error("mmap failed: %s\n", strerror(errno));
+	}
+
+	assert(state.wl_shm != NULL);
+	struct wl_shm_pool* pool = wl_shm_create_pool(state.wl_shm, fd, size);
+	assert(pool);
+
+	struct wl_buffer* buffer
+		= wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
+
+	assert(buffer);
+
+	wl_buffer_add_listener(buffer, &wl_buffer_listener, NULL);
+	upload_image_data(data);
+
+	wl_shm_pool_destroy(pool);
+	close(fd);
+	munmap(data, size);
+
+	return buffer;
 }
 
 static void create_buffers()
@@ -490,7 +540,7 @@ static void feedback_presented(void* data, struct wp_presentation_feedback* pres
 
 	prev_present = feedback->present;
 
-	create_next_frame();
+	// create_next_frame();
 }
 
 static void feedback_discarded(void* data, struct wp_presentation_feedback* presentation_feedback)
@@ -545,6 +595,9 @@ static void create_next_frame()
 
 	if (frame_committed == false)
 	{
+#ifdef SINGLE_BUFFER
+		wl_surface_attach(state.wl_surface, create_single_buffer(), 0, 0);
+#else
 		// Find next free buffer.
 		WaylandBuffer* next_buffer = NULL;
 
@@ -557,16 +610,18 @@ static void create_next_frame()
 			}
 		}
 
-		upload_image_data(next_buffer->data);
-
 		assert(next_buffer != NULL && "You need more buffers");
 		assert(next_buffer->wl_buffer != NULL);
 
+		upload_image_data(next_buffer->data);
+
 		wl_surface_attach(state.wl_surface, next_buffer->wl_buffer, 0, 0);
+		next_buffer->busy = true;
+#endif
+
 		wl_surface_damage_buffer(state.wl_surface, 0, 0, INT32_MAX, INT32_MAX);
 		frame_committed = true;
 		frame_presented = false;
-		next_buffer->busy = true;
 #if DEBUG_PRESENTATION_TIMING
 		printf("frame committed  @ %4ld ms\n", msec_since_start());
 #endif
@@ -578,6 +633,7 @@ static void create_next_frame()
 #endif
 	}
 
+end:
 	wl_surface_commit(state.wl_surface);
 }
 
@@ -1132,6 +1188,8 @@ static void fractional_scale_preferred_scale(void* data,
 		return;
 	}
 
+	prev_numerator = numerator;
+
 	const int old_stride = state.framebuffer_width * BYTES_PER_PIXEL;
 	const int old_size = old_stride * state.framebuffer_height * MAX_BUFFERS;
 
@@ -1139,6 +1197,10 @@ static void fractional_scale_preferred_scale(void* data,
 	state.framebuffer_width = (state.window_width * numerator + 60) / 120;
 	state.framebuffer_height = (state.window_height * numerator + 60) / 120;
 
+	printf("new preferred scale: %u/%d = %f, fb width:%d, height:%d\n", numerator, 120,
+		   numerator / 120.0f, state.framebuffer_width, state.framebuffer_height);
+
+#ifndef SINGLE_BUFFER
 	const int new_size
 		= state.framebuffer_width * BYTES_PER_PIXEL * state.framebuffer_height * MAX_BUFFERS;
 
@@ -1156,13 +1218,16 @@ static void fractional_scale_preferred_scale(void* data,
 	{
 		// TODO: maybe if any buffers aren't busy we could just resize them here.
 		// hmm but we might have problems overlapping with busy buffers's memory regions.
-		state.buffers[i].needs_resize = true;
+		if (state.buffers[i].busy == true)
+		{
+			state.buffers[i].needs_resize = true;
+		}
+		else
+		{
+			resize_buffer(&state.buffers[i]);
+		}
 	}
-
-	printf("new preferred scale: %u/%d = %f, fb width:%d, height:%d\n", numerator, 120,
-		   numerator / 120.0f, state.framebuffer_width, state.framebuffer_height);
-
-	prev_numerator = numerator;
+#endif
 }
 
 static const struct wp_fractional_scale_v1_listener fractional_scale_listener = {
@@ -1241,16 +1306,6 @@ static const struct wl_registry_listener wl_registry_listener = {
 
 void I_ShutdownGraphics(void) {}
 
-//
-// I_StartFrame
-//
-void I_StartFrame(void)
-{
-#if DEBUG_PRESENTATION_TIMING
-	printf("Started new frame @ %4ld ms\n", msec_since_start());
-#endif
-}
-
 static int dispatch_events()
 {
 	int num_dispatched = 0;
@@ -1263,6 +1318,19 @@ static int dispatch_events()
 	}
 
 	return num_dispatched;
+}
+
+//
+// I_StartFrame
+//
+void I_StartFrame(void)
+{
+#if DEBUG_PRESENTATION_TIMING
+	printf("Started new frame @ %4ld ms\n", msec_since_start());
+#endif
+
+	while (frame_presented == false)
+		dispatch_events();
 }
 
 //
@@ -1416,8 +1484,13 @@ void I_FinishUpdate(void)
 	printf("next frame ready @ %4ld ms\n", msec_since_start());
 #endif
 
-	while (frame_committed == false)
+	while (frame_presented == false)
 		dispatch_events();
+
+	create_next_frame();
+
+	while (dispatch_events() > 0)
+		;
 }
 
 //
@@ -1586,7 +1659,9 @@ void I_InitGraphics(void)
 	image->width = state.framebuffer_width;
 	image->height = state.framebuffer_height;
 	image->stride = image->width * BYTES_PER_PIXEL;
+#ifndef SINGLE_BUFFER
 	create_buffers();
+#endif
 	wl_surface_commit(state.wl_surface);
 	assert(wl_display_roundtrip(state.wl_display) != -1);
 
