@@ -4,121 +4,55 @@
 #
 # $Log:$
 #
-CC = gcc  # gcc or g++
+CC = gcc
 
-CFLAGS = -std=gnu99 -g -O0 -DNORMALUNIX -DLINUX -Wshadow -DDEBUG_PRESENTATION_TIMING -DDEBUG
+CPPFLAGS := -DNORMALUNIX -DLINUX -DDEBUG_PRESENTATION_TIMING -DDEBUG
+CFLAGS = -std=gnu99 -g -O0 -Wshadow
 LDFLAGS = -L/usr/X11R6/lib
-LIBS = -lXext -lX11 -lnsl -lm -lwayland-client -lxkbcommon
-SANITIZE_FLAGS = -fsanitize=address -fno-ipa-icf -fno-omit-frame-pointer
+LDLIBS = -lXext -lX11 -lnsl -lm -lwayland-client -lxkbcommon
+SANITIZE_FLAGS = -fsanitize=address -fno-ipa-icf -fno-omit-frame-pointer # todo
 
-WL_PROTOCOLS_BASE_PATH := $(shell pkg-config wayland-protocols --variable=pkgdatadir)
+BUILD_DIR := ./linux
+$(shell mkdir -p $(BUILD_DIR))
 
-# subdirectory for objects
-O = linux
+PROTOCOLS_BASE_PATH := $(shell pkg-config wayland-protocols --variable=pkgdatadir)
+PROTOCOL_NAMES := xdg-shell presentation-time viewporter
+PROTOCOL_DIR := ./wayland_protocols
 
-# not too sophisticated dependency
-OBJS = \
-		$(O)/doomdef.o \
-		$(O)/doomstat.o \
-		$(O)/dstrings.o \
-		$(O)/i_system.o \
-		$(O)/i_sound.o \
-		$(O)/i_video.o \
-		$(O)/i_net.o \
-		$(O)/tables.o \
-		$(O)/f_finale.o \
-		$(O)/f_wipe.o \
-		$(O)/d_main.o \
-		$(O)/d_net.o \
-		$(O)/d_items.o \
-		$(O)/g_game.o \
-		$(O)/m_menu.o \
-		$(O)/m_misc.o \
-		$(O)/m_argv.o \
-		$(O)/m_bbox.o \
-		$(O)/m_fixed.o \
-		$(O)/m_swap.o \
-		$(O)/m_cheat.o \
-		$(O)/m_random.o \
-		$(O)/am_map.o \
-		$(O)/p_ceilng.o \
-		$(O)/p_doors.o \
-		$(O)/p_enemy.o \
-		$(O)/p_floor.o \
-		$(O)/p_inter.o \
-		$(O)/p_lights.o \
-		$(O)/p_map.o \
-		$(O)/p_maputl.o \
-		$(O)/p_plats.o \
-		$(O)/p_pspr.o \
-		$(O)/p_setup.o \
-		$(O)/p_sight.o \
-		$(O)/p_spec.o \
-		$(O)/p_switch.o \
-		$(O)/p_mobj.o \
-		$(O)/p_telept.o \
-		$(O)/p_tick.o \
-		$(O)/p_saveg.o \
-		$(O)/p_user.o \
-		$(O)/r_bsp.o \
-		$(O)/r_data.o \
-		$(O)/r_draw.o \
-		$(O)/r_main.o \
-		$(O)/r_plane.o \
-		$(O)/r_segs.o \
-		$(O)/r_sky.o \
-		$(O)/r_things.o \
-		$(O)/w_wad.o \
-		$(O)/wi_stuff.o \
-		$(O)/v_video.o \
-		$(O)/st_lib.o \
-		$(O)/st_stuff.o \
-		$(O)/hu_stuff.o \
-		$(O)/hu_lib.o \
-		$(O)/s_sound.o \
-		$(O)/z_zone.o \
-		$(O)/info.o \
-		$(O)/sounds.o \
+get_protocol_abs_path = $(shell find $(PROTOCOLS_BASE_PATH) -name $(1).xml)
+
+extract_file_name = $(notdir $(basename $(1)))
+
+generate = $(shell wayland-scanner client-header < $(1) > $(PROTOCOL_DIR)/$(2).h \
+		   && wayland-scanner private-code < $(1) > $(PROTOCOL_DIR)/$(2).c)
+
+# I hate makefiles bro how did we get here
+evaluate_protocol = $(call generate,$(1),$(call extract_file_name,$(1),),)
+
+$(PROTOCOL_NAMES): $(shell mkdir -p $(PROTOCOL_DIR))
+	@echo generating $@
+	$(call evaluate_protocol,$(call get_protocol_abs_path,$@,),)
+	$(CC) $(CFLAGS) -isystem $(PROTOCOL_DIR) -c $(PROTOCOL_DIR)/$@.c -o $(BUILD_DIR)/$@.o $(LDLIBS)
+
+.PHONY: protocols
+protocols: $(PROTOCOL_NAMES)
+
+OBJECTS := $(patsubst %.c,%.o,$(wildcard *.c))
+
+$(OBJECTS): %.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -isystem $(PROTOCOL_DIR) -c $< -o $(BUILD_DIR)/$@ $(LDLIBS) $(LDFLAGS)
 
 .PHONY: all
-all: $(O)/linuxxdoom
+all: $(BUILD_DIR)/linuxxdoom
+
+$(BUILD_DIR)/linuxxdoom: protocols $(OBJECTS)
+	@echo $(PROTOCOL_OBJECTS)
+	$(CC) $(CPPFLAGS) -isystem $(PROTOCOL_DIR) $(BUILD_DIR)/*.o -o $@ $(LDLIBS) $(LDFLAGS)
 
 .PHONY: clean
 clean:
-	rm -f *.o *~ *.flc
-	rm -f linux/*
-
-.PHONY: protocols
-protocols:
-	$(shell mkdir -p ./wayland_protocols)
-
-	$(shell wayland-scanner client-header \
-		< $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml \
-		> ./wayland_protocols/xdg-shell.h)
-	$(shell wayland-scanner private-code \
-		< $(WL_PROTOCOLS_BASE_PATH)/stable/xdg-shell/xdg-shell.xml \
-		> ./wayland_protocols/xdg-shell.c)
-
-	$(shell wayland-scanner client-header \
-		< $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml \
-		> ./wayland_protocols/presentation-time.h)
-	$(shell wayland-scanner private-code \
-		< $(WL_PROTOCOLS_BASE_PATH)/stable/presentation-time/presentation-time.xml \
-		> ./wayland_protocols/presentation-time.c)
-
-	$(shell wayland-scanner client-header \
-		< $(WL_PROTOCOLS_BASE_PATH)/stable/viewporter/viewporter.xml \
-		> ./wayland_protocols/viewporter.h)
-	$(shell wayland-scanner private-code \
-		< $(WL_PROTOCOLS_BASE_PATH)/stable/viewporter/viewporter.xml \
-		> ./wayland_protocols/viewporter.c)
-
-$(O)/linuxxdoom: protocols $(OBJS) $(O)/i_main.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) $(O)/i_main.o \
-	-o $(O)/linuxxdoom $(LIBS)
-
-$(O)/%.o: %.c
-	$(CC) $(CFLAGS) -isystem ./wayland_protocols -c $< -o $@
+	rm -rf $(BUILD_DIR)
+	rm -rf $(PROTOCOL_DIR)
 
 .PHONY: test
 test:

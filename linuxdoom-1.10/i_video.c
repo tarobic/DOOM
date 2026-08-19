@@ -61,9 +61,9 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include "presentation-time.h"
 #include "viewporter.h"
 
-#include "xdg-shell.c"
-#include "presentation-time.c"
-#include "viewporter.c"
+// #include "xdg-shell.c"
+// #include "presentation-time.c"
+// #include "viewporter.c"
 
 // TODO:
 // replace audio system with pipewire
@@ -146,7 +146,7 @@ typedef struct
 	struct timespec commit, target, present;
 } PresentationFeedback;
 
-static struct WaylandState
+static struct
 {
 	struct wl_display* wl_display;
 	struct wl_registry* wl_registry;
