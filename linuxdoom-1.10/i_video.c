@@ -42,6 +42,8 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
 #include <X11/Xlib.h>
 
+#include <err.h>
+
 #include "d_main.h"
 #include "doomstat.h"
 #include "i_system.h"
@@ -77,7 +79,7 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 // - tearing control
 // - idle inhibit
 // - fractional scaling
-// - commit timing
+// - (done) commit timing
 // - single pixel buffer (for background when fullscreen)
 // - input timestamps ? (seemingly only implemented by weston at time of writing)
 // - fifo
@@ -100,6 +102,7 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #define MAX_BUFFERS 3
 static const int BYTES_PER_PIXEL = 4;
 static const long NSEC_PER_SEC = (long)1e9;
+static const int MAX_SCALING_FACTOR = 3; // at least on kde it can be 0.5 to 3.
 
 typedef enum
 {
@@ -133,8 +136,9 @@ typedef struct
 {
 	struct wl_buffer* wl_buffer;
 	void* data;
-	boolean busy;
+	boolean busy, needs_resize;
 	int width, height, stride;
+	int index;
 } WaylandBuffer;
 
 typedef struct
@@ -169,18 +173,24 @@ static struct
 
 	struct wp_content_type_manager_v1* wp_content_type_manager;
 
+	struct wp_fractional_scale_manager_v1* wp_fractional_scale_manager;
+
 	PointerEvent pointer_event;
 
-	int width, height;
-	int offset;
-	boolean closed;
+	int window_width, window_height;
+	int framebuffer_width, framebuffer_height;
 	boolean fullscreen;
 	uint32_t configure_serial;
+	int shm_fd;
+	struct wl_shm_pool* pool;
+	unsigned int* buffer_data;
 
 	WaylandBuffer buffers[MAX_BUFFERS];
 } state = {
-	.width = SCREENWIDTH,
-	.height = SCREENHEIGHT,
+	.window_width = SCREENWIDTH,
+	.window_height = SCREENHEIGHT,
+	.framebuffer_width = SCREENWIDTH,
+	.framebuffer_height = SCREENHEIGHT,
 };
 
 #define POINTER_WARP_COUNTDOWN 1
@@ -336,10 +346,41 @@ static long msec_since_start()
 	return timespec_sub_to_msec(&ts, &start_time);
 }
 
+static const struct wl_buffer_listener wl_buffer_listener;
+
 static void wl_buffer_release(void* data, struct wl_buffer* wl_buffer)
 {
 	WaylandBuffer* buffer = data;
 	buffer->busy = false;
+
+	if (buffer->needs_resize == true)
+	{
+		buffer->needs_resize = false;
+
+		assert(wl_buffer == buffer->wl_buffer);
+		wl_buffer_destroy(buffer->wl_buffer);
+
+		const int stride = state.framebuffer_width * BYTES_PER_PIXEL;
+		const int offset = buffer->index * stride * state.framebuffer_height;
+
+		struct wl_buffer* new_wl_buffer
+			= wl_shm_pool_create_buffer(state.pool, offset, state.framebuffer_width,
+										state.framebuffer_height, stride, WL_SHM_FORMAT_XRGB8888);
+
+		assert(new_wl_buffer);
+
+		state.buffers[buffer->index] = (WaylandBuffer){
+			.data = (byte*)state.buffer_data + offset,
+			.width = state.framebuffer_width,
+			.height = state.framebuffer_height,
+			.stride = stride,
+			.busy = false,
+			.wl_buffer = new_wl_buffer,
+			.index = buffer->index,
+		};
+
+		assert(wl_buffer_add_listener(new_wl_buffer, &wl_buffer_listener, buffer) != -1);
+	}
 }
 
 static const struct wl_buffer_listener wl_buffer_listener = {
@@ -347,6 +388,7 @@ static const struct wl_buffer_listener wl_buffer_listener = {
 };
 
 // Converts the colors in the data cached from screens[0]
+// FIXME: getting a segfault when jumping from %100 scaling to %150.
 static void upload_image_data(unsigned int* dst)
 {
 	for (int y = 0; y < SCREENHEIGHT; y++)
@@ -363,7 +405,7 @@ static void upload_image_data(unsigned int* dst)
 
 static void create_buffers()
 {
-	const int width = state.width, height = state.height;
+	const int width = state.framebuffer_width, height = state.framebuffer_height;
 	const int stride = width * BYTES_PER_PIXEL;
 	const int size = stride * height * MAX_BUFFERS;
 
@@ -380,14 +422,16 @@ static void create_buffers()
 		I_Error("mmap failed: %s\n", strerror(errno));
 	}
 
+	state.buffer_data = data;
+
 	assert(state.wl_shm != NULL);
-	struct wl_shm_pool* pool = wl_shm_create_pool(state.wl_shm, fd, size);
-	assert(pool);
+	state.pool = wl_shm_create_pool(state.wl_shm, fd, size);
+	assert(state.pool);
 
 	for (int i = 0, offset = 0; i < MAX_BUFFERS; i++, offset += stride * height)
 	{
-		struct wl_buffer* buffer = wl_shm_pool_create_buffer(pool, offset, width, height, stride,
-															 WL_SHM_FORMAT_XRGB8888);
+		struct wl_buffer* buffer = wl_shm_pool_create_buffer(state.pool, offset, width, height,
+															 stride, WL_SHM_FORMAT_XRGB8888);
 
 		assert(buffer);
 
@@ -398,13 +442,14 @@ static void create_buffers()
 			.stride = stride,
 			.busy = false,
 			.wl_buffer = buffer,
+			.index = i,
 		};
 
 		assert(wl_buffer_add_listener(buffer, &wl_buffer_listener, &state.buffers[i]) != -1);
 	}
 
-	wl_shm_pool_destroy(pool);
-	assert(close(fd) != -1);
+	// wl_shm_pool_destroy(pool);
+	// assert(close(fd) != -1);
 }
 
 static const struct wl_callback_listener wl_surface_frame_listener;
@@ -566,13 +611,13 @@ static void xdg_toplevel_configure(void* data, struct xdg_toplevel* xdg_toplevel
 	if (width == 0 || height == 0)
 		return;
 
-	state.width = width;
-	state.height = height;
+	state.window_width = width;
+	state.window_height = height;
 }
 
 static void xdg_toplevel_close(void* data, struct xdg_toplevel* toplevel)
 {
-	state.closed = true;
+	// todo
 }
 
 static void xdg_toplevel_configure_bounds(void* data, struct xdg_toplevel* toplevel, int32_t width,
@@ -1008,9 +1053,10 @@ static void wl_keyboard_key(void* data, struct wl_keyboard* wl_keyboard, uint32_
 static void wl_keyboard_leave(void* data, struct wl_keyboard* wl_keyboard, uint32_t serial,
 							  struct wl_surface* surface)
 {
-	xkb_state_unref(state.xkb_state);
-	xkb_keymap_unref(state.xkb_keymap);
-	xkb_context_unref(state.xkb_context);
+	// fixme: xkb crashes when dragging game window then changing focus to a different window.
+	// xkb_state_unref(state.xkb_state);
+	// xkb_keymap_unref(state.xkb_keymap);
+	// xkb_context_unref(state.xkb_context);
 }
 
 static void wl_keyboard_modifiers(void* data, struct wl_keyboard* wl_keyboard, uint32_t serial,
@@ -1074,6 +1120,55 @@ const struct wl_seat_listener wl_seat_listener = {
 	.name = wl_seat_name,
 };
 
+static void fractional_scale_preferred_scale(void* data,
+											 struct wp_fractional_scale_v1* fractional_scale,
+											 uint32_t numerator)
+{
+	static uint32_t prev_numerator = 120;
+
+	if (prev_numerator == numerator)
+	{
+		printf("Got a new preferred scale but its the same as the last one\n");
+		return;
+	}
+
+	const int old_stride = state.framebuffer_width * BYTES_PER_PIXEL;
+	const int old_size = old_stride * state.framebuffer_height * MAX_BUFFERS;
+
+	// scale away from 0
+	state.framebuffer_width = (state.window_width * numerator + 60) / 120;
+	state.framebuffer_height = (state.window_height * numerator + 60) / 120;
+
+	const int new_size
+		= state.framebuffer_width * BYTES_PER_PIXEL * state.framebuffer_height * MAX_BUFFERS;
+
+	unsigned int* new_data = mremap(state.buffer_data, old_size, new_size, MREMAP_MAYMOVE);
+	if (new_data == MAP_FAILED)
+	{
+		err(EXIT_FAILURE,
+			"Failed to to resize WaylandBuffer data with new fractional scale size: %d %d\n",
+			state.framebuffer_width, state.framebuffer_height);
+	}
+
+	state.buffer_data = new_data;
+
+	for (int i = 0; i < MAX_BUFFERS; i++)
+	{
+		// TODO: maybe if any buffers aren't busy we could just resize them here.
+		// hmm but we might have problems overlapping with busy buffers's memory regions.
+		state.buffers[i].needs_resize = true;
+	}
+
+	printf("new preferred scale: %u/%d = %f, fb width:%d, height:%d\n", numerator, 120,
+		   numerator / 120.0f, state.framebuffer_width, state.framebuffer_height);
+
+	prev_numerator = numerator;
+}
+
+static const struct wp_fractional_scale_v1_listener fractional_scale_listener = {
+	.preferred_scale = fractional_scale_preferred_scale,
+};
+
 static void registry_global(void* data, struct wl_registry* wl_registry, uint32_t name,
 							const char* interface, uint32_t version)
 {
@@ -1125,6 +1220,13 @@ static void registry_global(void* data, struct wl_registry* wl_registry, uint32_
 			= wl_registry_bind(wl_registry, name, &wp_content_type_manager_v1_interface, version);
 
 		assert(state.wp_content_type_manager);
+	}
+	else if (strcmp(interface, wp_fractional_scale_manager_v1_interface.name) == 0)
+	{
+		state.wp_fractional_scale_manager = wl_registry_bind(
+			wl_registry, name, &wp_fractional_scale_manager_v1_interface, version);
+
+		assert(state.wp_fractional_scale_manager);
 	}
 }
 
@@ -1411,8 +1513,10 @@ void I_InitGraphics(void)
 			I_Error("bad -geom parameter");
 	}
 
-	if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
-		fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
+#if DEBUG
+	// if (setenv("WAYLAND_DEBUG", "client", 1) == -1)
+	// 	fprintf(stderr, "failed to set wl debug env: %s", strerror(errno));
+#endif
 
 	state.wl_display = wl_display_connect(NULL);
 	if (state.wl_display == NULL)
@@ -1420,8 +1524,8 @@ void I_InitGraphics(void)
 
 	fprintf(stderr, "connected to wl_display\n");
 
-	state.wl_registry = wl_display_get_registry(state.wl_display), state.width = X_width,
-	state.height = X_height, state.xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS),
+	state.wl_registry = wl_display_get_registry(state.wl_display), state.window_width = X_width,
+	state.window_height = X_height, state.xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS),
 
 	assert(state.wl_registry);
 	assert(state.xkb_context);
@@ -1445,13 +1549,6 @@ void I_InitGraphics(void)
 		xdg_toplevel_set_app_id(state.xdg_toplevel, "gamedev");
 	}
 
-	// viewport
-	{
-		state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
-		assert(state.wp_viewport);
-		wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH * 4, SCREENHEIGHT * 4);
-	}
-
 	// content type
 	{
 		assert(state.wp_content_type_manager);
@@ -1463,8 +1560,32 @@ void I_InitGraphics(void)
 		wp_content_type_v1_set_content_type(content_type, WP_CONTENT_TYPE_V1_TYPE_GAME);
 	}
 
+	// fractional scale
+	{
+		struct wp_fractional_scale_v1* fractional_scale
+			= wp_fractional_scale_manager_v1_get_fractional_scale(state.wp_fractional_scale_manager,
+																  state.wl_surface);
+		assert(fractional_scale);
+
+		assert(
+			wp_fractional_scale_v1_add_listener(fractional_scale, &fractional_scale_listener, NULL)
+			!= -1);
+	}
+
+	// viewport
+	{
+		// NOTE: Per the spec, if using fractional scaling, this should always be set
+		// to the surface size before scaling is applied.
+		state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
+		assert(state.wp_viewport);
+		wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH, SCREENHEIGHT);
+	}
+
 	image = malloc(sizeof *image);
-	image->data = calloc(SCREENWIDTH * SCREENHEIGHT, sizeof(byte));
+	image->data = calloc(state.framebuffer_width * state.framebuffer_height, sizeof(byte));
+	image->width = state.framebuffer_width;
+	image->height = state.framebuffer_height;
+	image->stride = image->width * BYTES_PER_PIXEL;
 	create_buffers();
 	wl_surface_commit(state.wl_surface);
 	assert(wl_display_roundtrip(state.wl_display) != -1);
