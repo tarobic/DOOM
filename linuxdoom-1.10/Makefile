@@ -12,6 +12,7 @@ CPPFLAGS += -DDEBUG
 export WAYLAND_DEBUG = 1
 
 CFLAGS = -std=gnu99 -g -O0 -Wshadow
+CFLAGS += -fno-strict-aliasing # might help with thinker_t type punning
 LDFLAGS = -L/usr/X11R6/lib
 LDLIBS = -lXext -lX11 -lnsl -lm -lwayland-client -lxkbcommon
 SANITIZE_FLAGS = -fsanitize=address -fno-ipa-icf -fno-omit-frame-pointer # todo
@@ -20,7 +21,8 @@ BUILD_DIR := ./linux
 $(shell mkdir -p $(BUILD_DIR))
 
 PROTOCOLS_BASE_PATH := $(shell pkg-config wayland-protocols --variable=pkgdatadir)
-PROTOCOL_NAMES := xdg-shell presentation-time viewporter fractional-scale-v1 content-type-v1
+PROTOCOL_NAMES := xdg-shell presentation-time viewporter fractional-scale-v1 content-type-v1 \
+				  single-pixel-buffer-v1
 PROTOCOL_DIR := ./wayland_protocols
 
 get_protocol_abs_path = $(shell find $(PROTOCOLS_BASE_PATH) -name $(1).xml)

@@ -64,22 +64,24 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include "viewporter.h"
 #include "fractional-scale-v1.h"
 #include "content-type-v1.h"
+#include "single-pixel-buffer-v1.h"
 
 // TODO:
 // replace audio system with pipewire
 // mouse + extensions (relative, constraints, warp)
 // resolution/scaling
+// fullscreen
 // deal with clang warnings for og code
 // tighten up presentation timing
 // check for minimum supported versions of mandatory wayland protocols
 // switch to camelcase to be consistent with og code.
 // error handling
 // wayland extensions: (some can be optional)
-// - content type
+// - (done) content type
 // - tearing control
 // - idle inhibit
 // - fractional scaling
-// - (done) commit timing
+// - commit timing
 // - single pixel buffer (for background when fullscreen)
 // - input timestamps ? (seemingly only implemented by weston at time of writing)
 // - fifo
@@ -384,7 +386,6 @@ static void wl_buffer_release(void* data, struct wl_buffer* wl_buffer)
 #ifdef SINGLE_BUFFER
 	wl_buffer_destroy(wl_buffer);
 #else
-
 	WaylandBuffer* buffer = data;
 	buffer->busy = false;
 
@@ -400,7 +401,7 @@ static const struct wl_buffer_listener wl_buffer_listener = {
 };
 
 // Converts the colors in the data cached from screens[0]
-// FIXME: getting a segfault when jumping from %100 scaling to %150.
+// FIXME: getting a segfault with fractional scaling when jumping from %100 scaling to %150.
 static void upload_image_data(unsigned int* dst)
 {
 	for (int y = 0; y < SCREENHEIGHT; y++)
@@ -1216,8 +1217,6 @@ static void fractional_scale_preferred_scale(void* data,
 
 	for (int i = 0; i < MAX_BUFFERS; i++)
 	{
-		// TODO: maybe if any buffers aren't busy we could just resize them here.
-		// hmm but we might have problems overlapping with busy buffers's memory regions.
 		if (state.buffers[i].busy == true)
 		{
 			state.buffers[i].needs_resize = true;
@@ -1286,13 +1285,13 @@ static void registry_global(void* data, struct wl_registry* wl_registry, uint32_
 
 		assert(state.wp_content_type_manager);
 	}
-	else if (strcmp(interface, wp_fractional_scale_manager_v1_interface.name) == 0)
-	{
-		state.wp_fractional_scale_manager = wl_registry_bind(
-			wl_registry, name, &wp_fractional_scale_manager_v1_interface, version);
-
-		assert(state.wp_fractional_scale_manager);
-	}
+	// else if (strcmp(interface, wp_fractional_scale_manager_v1_interface.name) == 0)
+	// {
+	// 	state.wp_fractional_scale_manager = wl_registry_bind(
+	// 		wl_registry, name, &wp_fractional_scale_manager_v1_interface, version);
+	//
+	// 	assert(state.wp_fractional_scale_manager);
+	// }
 }
 
 static void registry_global_remove(void* data, struct wl_registry* wl_registry, unsigned int name)
@@ -1520,6 +1519,36 @@ void I_SetPalette(byte* palette)
 	}
 }
 
+static void wl_surface_enter(void* data, struct wl_surface* wl_surface, struct wl_output* wl_output)
+{
+}
+
+static void wl_surface_leave(void* data, struct wl_surface* wl_surface, struct wl_output* wl_output)
+{
+}
+
+static void wl_surface_preferred_buffer_scale(void* data, struct wl_surface* wl_surface,
+											  int32_t factor)
+{
+	if (state.wp_fractional_scale_manager == NULL)
+	{
+		printf("Preferred buffer scale: %d\n", factor);
+		wl_surface_set_buffer_scale(state.wl_surface, factor);
+	}
+}
+
+static void wl_surface_preferred_buffer_transform(void* data, struct wl_surface* wl_surface,
+												  uint32_t transform)
+{
+}
+
+static const struct wl_surface_listener wl_surface_listener = {
+	.enter = wl_surface_enter,
+	.leave = wl_surface_leave,
+	.preferred_buffer_scale = wl_surface_preferred_buffer_scale,
+	.preferred_buffer_transform = wl_surface_preferred_buffer_transform,
+};
+
 void I_InitGraphics(void)
 {
 	char* displayname;
@@ -1609,6 +1638,8 @@ void I_InitGraphics(void)
 	state.wl_surface = wl_compositor_create_surface(state.wl_compositor);
 	assert(state.wl_surface);
 
+	assert(wl_surface_add_listener(state.wl_surface, &wl_surface_listener, NULL) != -1);
+
 	// xdg shell
 	{
 		state.xdg_surface = xdg_wm_base_get_xdg_surface(state.xdg_wm_base, state.wl_surface);
@@ -1633,7 +1664,14 @@ void I_InitGraphics(void)
 		wp_content_type_v1_set_content_type(content_type, WP_CONTENT_TYPE_V1_TYPE_GAME);
 	}
 
+	// viewport
+	{
+		state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
+		assert(state.wp_viewport);
+	}
+
 	// fractional scale
+	if (state.wp_fractional_scale_manager != NULL)
 	{
 		struct wp_fractional_scale_v1* fractional_scale
 			= wp_fractional_scale_manager_v1_get_fractional_scale(state.wp_fractional_scale_manager,
@@ -1643,15 +1681,14 @@ void I_InitGraphics(void)
 		assert(
 			wp_fractional_scale_v1_add_listener(fractional_scale, &fractional_scale_listener, NULL)
 			!= -1);
-	}
 
-	// viewport
-	{
 		// NOTE: Per the spec, if using fractional scaling, this should always be set
 		// to the surface size before scaling is applied.
-		state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
-		assert(state.wp_viewport);
 		wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH, SCREENHEIGHT);
+	}
+	else
+	{
+		wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH * 2, SCREENHEIGHT * 2);
 	}
 
 	image = malloc(sizeof *image);
