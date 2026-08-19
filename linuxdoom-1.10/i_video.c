@@ -60,10 +60,8 @@ static const char rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include "xdg-shell.h"
 #include "presentation-time.h"
 #include "viewporter.h"
-
-// #include "xdg-shell.c"
-// #include "presentation-time.c"
-// #include "viewporter.c"
+#include "fractional-scale-v1.h"
+#include "content-type-v1.h"
 
 // TODO:
 // replace audio system with pipewire
@@ -168,6 +166,8 @@ static struct
 
 	struct wp_viewport* wp_viewport;
 	struct wp_viewporter* wp_viewporter;
+
+	struct wp_content_type_manager_v1* wp_content_type_manager;
 
 	PointerEvent pointer_event;
 
@@ -997,6 +997,11 @@ static void wl_keyboard_key(void* data, struct wl_keyboard* wl_keyboard, uint32_
 
 		state.fullscreen = !state.fullscreen;
 	}
+	else if (sym == XKB_KEY_grave)
+	{
+		printf("bye\n");
+		exit(EXIT_SUCCESS);
+	}
 #endif
 }
 
@@ -1113,6 +1118,13 @@ static void registry_global(void* data, struct wl_registry* wl_registry, uint32_
 	{
 		state.wp_viewporter = wl_registry_bind(wl_registry, name, &wp_viewporter_interface, 1);
 		assert(state.wp_viewporter != NULL);
+	}
+	else if (strcmp(interface, wp_content_type_manager_v1_interface.name) == 0)
+	{
+		state.wp_content_type_manager
+			= wl_registry_bind(wl_registry, name, &wp_content_type_manager_v1_interface, version);
+
+		assert(state.wp_content_type_manager);
 	}
 }
 
@@ -1420,18 +1432,36 @@ void I_InitGraphics(void)
 	state.wl_surface = wl_compositor_create_surface(state.wl_compositor);
 	assert(state.wl_surface);
 
-	state.xdg_surface = xdg_wm_base_get_xdg_surface(state.xdg_wm_base, state.wl_surface);
-	assert(state.xdg_surface);
-	assert(xdg_surface_add_listener(state.xdg_surface, &xdg_surface_listener, &state) != -1);
+	// xdg shell
+	{
+		state.xdg_surface = xdg_wm_base_get_xdg_surface(state.xdg_wm_base, state.wl_surface);
+		assert(state.xdg_surface);
+		assert(xdg_surface_add_listener(state.xdg_surface, &xdg_surface_listener, &state) != -1);
 
-	state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
-	assert(state.xdg_toplevel);
-	assert(xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state) != -1);
+		state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
+		assert(state.xdg_toplevel);
+		assert(xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state) != -1);
 
-	xdg_toplevel_set_app_id(state.xdg_toplevel, "gamedev");
+		xdg_toplevel_set_app_id(state.xdg_toplevel, "gamedev");
+	}
 
-	state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
-	wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH * 4, SCREENHEIGHT * 4);
+	// viewport
+	{
+		state.wp_viewport = wp_viewporter_get_viewport(state.wp_viewporter, state.wl_surface);
+		assert(state.wp_viewport);
+		wp_viewport_set_destination(state.wp_viewport, SCREENWIDTH * 4, SCREENHEIGHT * 4);
+	}
+
+	// content type
+	{
+		assert(state.wp_content_type_manager);
+		struct wp_content_type_v1* content_type
+			= wp_content_type_manager_v1_get_surface_content_type(state.wp_content_type_manager,
+																  state.wl_surface);
+		assert(content_type);
+
+		wp_content_type_v1_set_content_type(content_type, WP_CONTENT_TYPE_V1_TYPE_GAME);
+	}
 
 	image = malloc(sizeof *image);
 	image->data = calloc(SCREENWIDTH * SCREENHEIGHT, sizeof(byte));

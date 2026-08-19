@@ -16,7 +16,7 @@ BUILD_DIR := ./linux
 $(shell mkdir -p $(BUILD_DIR))
 
 PROTOCOLS_BASE_PATH := $(shell pkg-config wayland-protocols --variable=pkgdatadir)
-PROTOCOL_NAMES := xdg-shell presentation-time viewporter
+PROTOCOL_NAMES := xdg-shell presentation-time viewporter fractional-scale-v1 content-type-v1
 PROTOCOL_DIR := ./wayland_protocols
 
 get_protocol_abs_path = $(shell find $(PROTOCOLS_BASE_PATH) -name $(1).xml)
